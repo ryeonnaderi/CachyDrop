@@ -3,9 +3,38 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import Qt.labs.settings
-
+import QtQuick.Layouts
 Kirigami.ApplicationWindow {
     id: root
+    property int selectedPage: 0
+
+    globalDrawer: Kirigami.GlobalDrawer {
+    id: navigationDrawer
+    title: "CachyDrop"
+    titleIcon: "network-connect"
+    modal: false
+
+    actions: [
+        Kirigami.Action {
+            text: "CachyDrop"
+            icon.name: "document-send"
+            checked: root.selectedPage === 0
+            onTriggered: root.selectedPage = 0
+        },
+        Kirigami.Action {
+            text: "Paired Devices"
+            icon.name: "network-connect"
+            checked: root.selectedPage === 1
+            onTriggered: root.selectedPage = 1
+        },
+        Kirigami.Action {
+            text: "Appearance"
+            icon.name: "preferences-desktop-theme"
+            checked: root.selectedPage === 2
+            onTriggered: root.selectedPage = 2
+        }
+    ]
+}
 
     color: "transparent"
 
@@ -46,34 +75,13 @@ Kirigami.ApplicationWindow {
     }
 
     pageStack.initialPage: Kirigami.Page {
-        title: "CachyDrop"
-        actions: [
-    Kirigami.Action {
-    text: "Devices"
-    icon.name: "network-connect"
-
-    onTriggered: {
-        if (!pageStack.currentItem ||
-            pageStack.currentItem.objectName !== "deviceManagerPage") {
-            pageStack.push(devicePage)
-        }
-    }
-},
-
-    
-Kirigami.Action {
-    text: "Appearance"
-    icon.name: "preferences-desktop-theme"
-
-    onTriggered: {
-        if (!pageStack.currentItem ||
-            pageStack.currentItem.objectName !== "appearanceSettingsPage") {
-            pageStack.push(appearancePage)
-        }
-    }
-}
-
-]
+    objectName: "homePage"
+    title: "CachyDrop"
+    StackLayout {
+    id: contentLayout
+    anchors.fill: parent
+    currentIndex: root.selectedPage
+      
 
         Flickable {
             anchors.fill: parent
@@ -485,9 +493,18 @@ Kirigami.Action {
                             font.weight: Font.Medium
                         }
                     }
-                }
+                         }
             }
         }
+
+        Loader {
+            sourceComponent: devicePage
+        }
+
+        Loader {
+            sourceComponent: appearancePage
+        }
+    }
     }
 
     QQC2.Dialog {
@@ -638,10 +655,9 @@ Kirigami.Action {
 
     Component {
         id: devicePage
-
-        Kirigami.ScrollablePage {
-                objectName: "deviceManagerPage"
-            title: "Paired devices"
+Item {
+    anchors.fill: parent
+    objectName: "deviceManagerPage"
 
             Column {
                 width: parent.width
@@ -726,11 +742,7 @@ Kirigami.Action {
                     }
                 }
 
-                QQC2.Button {
-                    text: "Back"
-                    icon.name: "go-previous"
-                    onClicked: pageStack.pop()
-                }
+               
             }
         }
     }
@@ -739,9 +751,10 @@ Kirigami.Action {
 Component {
     id: appearancePage
 
-    Kirigami.ScrollablePage {
+    Item {
+    anchors.fill: parent
         objectName: "appearanceSettingsPage"
-        title: "Appearance"
+        
 
 
             Column {
@@ -838,11 +851,7 @@ QQC2.Slider {
                     visible: true
                 }
 
-                QQC2.Button {
-                    text: "Back"
-                    icon.name: "go-previous"
-                    onClicked: pageStack.pop()
-                }
+              
             }
         }
     }
