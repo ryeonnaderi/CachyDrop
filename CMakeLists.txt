@@ -40,6 +40,8 @@ qt_add_executable(cachydrop
     src/QrCodeUtils.cpp
     src/HttpRequestParser.h
     src/HttpRequestParser.cpp
+    src/RequestRouter.h
+    src/RequestRouter.cpp
 )
 
 qt_add_qml_module(cachydrop

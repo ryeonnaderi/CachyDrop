@@ -10,6 +10,9 @@
 #include <QVector>
 #include <QVariant>
 #include "PairingManager.h"
+#include "HttpRequestParser.h"
+
+class RequestRouter;
 
 class ReceiverServer : public QObject
 {
@@ -85,6 +88,7 @@ signals:
     void trustedDevicesChanged();
 
 private:
+    friend class RequestRouter;
     struct TransferFile {
         QString filename;
         qint64 size = 0;
@@ -109,6 +113,7 @@ private:
 
     QTcpServer m_server;
     PairingManager m_pairingManager;
+
 
     QString m_address;
     QString m_pairingCode;
