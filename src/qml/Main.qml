@@ -23,6 +23,13 @@ Kirigami.ApplicationWindow {
             else
                 approvalDialog.close()
         }
+
+        function onPairingRequestChanged() {
+            if (receiverServer.hasPendingPairing)
+                pairingDialog.open()
+            else
+                pairingDialog.close()
+        }
     }
 
     pageStack.initialPage: Kirigami.Page {
@@ -125,7 +132,6 @@ Kirigami.ApplicationWindow {
                             border.width: 1
                             border.color: "#d8dce3"
                             visible: receiverServer.qrRows.length > 0
-
                             anchors.horizontalCenter: parent.horizontalCenter
 
                             Canvas {
@@ -210,7 +216,7 @@ Kirigami.ApplicationWindow {
 
                         QQC2.Label {
                             width: parent.width
-                            text: "Your pairing code"
+                            text: "Pairing code"
                             horizontalAlignment: Text.AlignHCenter
                             opacity: 0.8
                         }
@@ -224,7 +230,7 @@ Kirigami.ApplicationWindow {
 
                         QQC2.Label {
                             width: parent.width
-                            text: "Enter this code on your phone to pair."
+                            text: "Scan the QR code to request device pairing."
                             wrapMode: Text.Wrap
                             horizontalAlignment: Text.AlignHCenter
                             opacity: 0.8
@@ -270,7 +276,6 @@ Kirigami.ApplicationWindow {
                             icon.name: "document-send"
                             enabled: receiverServer.running
                             highlighted: true
-
                             onClicked: fileDialog.open()
                         }
 
@@ -315,16 +320,6 @@ Kirigami.ApplicationWindow {
     }
 
     QQC2.Dialog {
-        id: fileSelectionError
-        parent: root.overlay
-        anchors.centerIn: parent
-        width: Math.min(root.width - 48, 380)
-        title: "No files could be shared"
-        standardButtons: QQC2.Dialog.Ok
-        modal: true
-    }
-
-    QQC2.Dialog {
         id: errorDialog
         parent: root.overlay
         anchors.centerIn: parent
@@ -339,6 +334,68 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    // Device pairing approval — separate from file-transfer approval.
+    QQC2.Dialog {
+        id: pairingDialog
+        parent: root.overlay
+        anchors.centerIn: parent
+        width: Math.min(root.width - 48, 420)
+        title: "Device wants to pair"
+        modal: true
+        closePolicy: QQC2.Popup.NoAutoClose
+
+        contentItem: Column {
+            spacing: Kirigami.Units.mediumSpacing
+            width: parent ? parent.width : 360
+
+            QQC2.Label {
+                width: parent.width
+                text: "A device is requesting permission to pair with CachyDrop."
+                wrapMode: Text.Wrap
+            }
+
+            QQC2.Label {
+                width: parent.width
+                text: "Device: " + receiverServer.pendingDevice
+                wrapMode: Text.Wrap
+                font.bold: true
+            }
+
+            QQC2.Label {
+                width: parent.width
+                text: "Only approve this request if you initiated it from your own phone."
+                wrapMode: Text.Wrap
+                opacity: 0.8
+            }
+        }
+
+        footer: QQC2.DialogButtonBox {
+            standardButtons: QQC2.DialogButtonBox.NoButton
+
+            QQC2.Button {
+                text: "Reject"
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+
+                onClicked: {
+                    receiverServer.rejectPairing()
+                    pairingDialog.close()
+                }
+            }
+
+            QQC2.Button {
+                text: "Approve device"
+                highlighted: true
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+
+                onClicked: {
+                    receiverServer.approvePairing()
+                    pairingDialog.close()
+                }
+            }
+        }
+    }
+
+    // Incoming file-transfer approval remains separate.
     QQC2.Dialog {
         id: approvalDialog
         parent: root.overlay
@@ -357,6 +414,26 @@ Kirigami.ApplicationWindow {
                 text: "A device wants to send files to this computer."
                 wrapMode: Text.Wrap
             }
+
+            QQC2.Label {
+                width: parent.width
+                text: "File: " + receiverServer.pendingFilename
+                wrapMode: Text.Wrap
+                font.bold: true
+            }
+
+            QQC2.Label {
+                width: parent.width
+                text: "Size: " + receiverServer.pendingSize + " bytes"
+                wrapMode: Text.Wrap
+            }
+
+            QQC2.Label {
+                width: parent.width
+                text: "Sender: " + receiverServer.pendingSender
+                wrapMode: Text.Wrap
+                opacity: 0.8
+            }
         }
 
         footer: QQC2.DialogButtonBox {
@@ -367,20 +444,18 @@ Kirigami.ApplicationWindow {
                 QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
 
                 onClicked: {
-                    if (receiverServer.rejectRequest)
-                        receiverServer.rejectRequest()
+                    receiverServer.rejectRequest()
                     approvalDialog.close()
                 }
             }
 
             QQC2.Button {
-                text: "Approve"
+                text: "Approve transfer"
                 highlighted: true
                 QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
 
                 onClicked: {
-                    if (receiverServer.approveRequest)
-                        receiverServer.approveRequest()
+                    receiverServer.approveRequest()
                     approvalDialog.close()
                 }
             }
