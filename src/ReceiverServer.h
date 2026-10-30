@@ -39,6 +39,8 @@ class ReceiverServer : public QObject
 
     Q_PROPERTY(int sharedFileCount READ sharedFileCount
                NOTIFY sharedFilesChanged)
+    Q_PROPERTY(QVariantList trustedDeviceList READ trustedDeviceList
+           NOTIFY trustedDevicesChanged)
 
 public:
     explicit ReceiverServer(QObject *parent = nullptr);
@@ -60,6 +62,9 @@ public:
     QString pendingDevice() const;
 
     int sharedFileCount() const;
+    QVariantList trustedDeviceList() const;
+
+    Q_INVOKABLE bool removeTrustedDevice(const QString &token);
 
     Q_INVOKABLE int shareFiles(const QStringList &paths);
     Q_INVOKABLE bool start();
@@ -76,6 +81,7 @@ signals:
     void pendingRequestChanged();
     void pairingRequestChanged();
     void sharedFilesChanged();
+    void trustedDevicesChanged();
 
 private:
     struct TransferFile {

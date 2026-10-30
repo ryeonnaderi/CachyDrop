@@ -570,6 +570,38 @@ int ReceiverServer::sharedFileCount() const
 {
     return m_sharedFiles.size();
 }
+QVariantList ReceiverServer::trustedDeviceList() const
+{
+    QVariantList devices;
+
+    for (auto it = m_trustedDevices.cbegin();
+         it != m_trustedDevices.cend(); ++it) {
+        QVariantMap device;
+        device.insert("token", it.key());
+        device.insert("name", it.value());
+        devices.append(device);
+    }
+
+    return devices;
+}
+
+bool ReceiverServer::removeTrustedDevice(const QString &token)
+{
+    if (token.isEmpty() || !m_trustedDevices.contains(token))
+        return false;
+
+    m_trustedDevices.remove(token);
+    m_sessions.remove(token);
+
+    QSettings settings;
+    settings.beginGroup("trustedDevices");
+    settings.remove(token);
+    settings.endGroup();
+    settings.sync();
+
+    emit trustedDevicesChanged();
+    return true;
+}
 
 int ReceiverServer::shareFiles(const QStringList &paths)
 {
@@ -745,6 +777,7 @@ settings.endGroup();
 settings.sync();
 
 emit pairingRequestChanged();
+emit trustedDevicesChanged();
 }
 
 void ReceiverServer::rejectPairing()

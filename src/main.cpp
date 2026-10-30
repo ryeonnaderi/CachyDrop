@@ -7,12 +7,14 @@
 #include <QUrl>
 #include <QStringList>
 #include <QWindow>
+#include <QQuickWindow>
 
 #include "ReceiverServer.h"
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    QQuickWindow::setDefaultAlphaBuffer(true);
 
     QGuiApplication::setApplicationName("CachyDrop");
     QGuiApplication::setOrganizationName("CachyDrop");
@@ -37,6 +39,11 @@ int main(int argc, char *argv[])
 
     if (engine.rootObjects().isEmpty())
         return -1;
+    auto *window = qobject_cast<QQuickWindow *>(
+    engine.rootObjects().first());
+
+if (window)
+    window->setColor(Qt::transparent);
 
    
 

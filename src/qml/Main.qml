@@ -2,9 +2,23 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
+import Qt.labs.settings
 
 Kirigami.ApplicationWindow {
     id: root
+
+    color: "transparent"
+
+        Settings {
+        id: appSettings
+        category: "Appearance"
+
+        property string theme: "System"
+        property string accent: "Blue"
+        property string style: "KDE Native"
+        property bool transparencyEnabled: false
+        property real windowOpacity: 0.85
+    }
 
     title: "CachyDrop"
     width: 900
@@ -33,6 +47,33 @@ Kirigami.ApplicationWindow {
 
     pageStack.initialPage: Kirigami.Page {
         title: "CachyDrop"
+        actions: [
+    Kirigami.Action {
+    text: "Devices"
+    icon.name: "network-connect"
+
+    onTriggered: {
+        if (!pageStack.currentItem ||
+            pageStack.currentItem.objectName !== "deviceManagerPage") {
+            pageStack.push(devicePage)
+        }
+    }
+},
+
+    
+Kirigami.Action {
+    text: "Appearance"
+    icon.name: "preferences-desktop-theme"
+
+    onTriggered: {
+        if (!pageStack.currentItem ||
+            pageStack.currentItem.objectName !== "appearanceSettingsPage") {
+            pageStack.push(appearancePage)
+        }
+    }
+}
+
+]
 
         Flickable {
             anchors.fill: parent
@@ -590,6 +631,217 @@ Kirigami.ApplicationWindow {
                 onClicked: {
                     receiverServer.approveRequest()
                     approvalDialog.close()
+                }
+            }
+        }
+    }
+
+    Component {
+        id: devicePage
+
+        Kirigami.ScrollablePage {
+                objectName: "deviceManagerPage"
+            title: "Paired devices"
+
+            Column {
+                width: parent.width
+                spacing: Kirigami.Units.largeSpacing
+
+                Kirigami.Heading {
+                    text: "Your devices"
+                    level: 2
+                }
+
+                QQC2.Label {
+                    width: parent.width
+                    text: "These devices have been approved to connect to CachyDrop. Removing a device revokes its saved authorization."
+                    wrapMode: Text.Wrap
+                    opacity: 0.8
+                }
+
+                QQC2.Label {
+                    width: parent.width
+                    text: "No paired devices yet."
+                    visible: receiverServer.trustedDeviceList.length === 0
+                    opacity: 0.7
+                }
+
+                Repeater {
+                    model: receiverServer.trustedDeviceList
+
+                    delegate: Rectangle {
+                        required property var modelData
+
+                        width: parent.width
+                        height: deviceDetails.implicitHeight + 24
+                        radius: 12
+                        color: Kirigami.Theme.backgroundColor
+                        border.width: 1
+                        border.color: Kirigami.Theme.alternateBackgroundColor
+
+                        Row {
+                            id: deviceDetails
+
+                            x: 12
+                            y: 12
+                            width: parent.width - 24
+                            spacing: Kirigami.Units.mediumSpacing
+
+                            Column {
+                                width: Math.max(
+                                    100,
+                                    parent.width - removeButton.width
+                                    - parent.spacing
+                                )
+                                spacing: 4
+
+                                QQC2.Label {
+                                    width: parent.width
+                                    text: modelData.name
+                                    font.bold: true
+                                    wrapMode: Text.Wrap
+                                }
+
+                                QQC2.Label {
+                                    width: parent.width
+                                    text: "Paired device"
+                                    opacity: 0.7
+                                }
+                            }
+
+                            QQC2.Button {
+                                id: removeButton
+
+                                text: "Remove"
+                                icon.name: "edit-delete"
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                onClicked: {
+                                    receiverServer.removeTrustedDevice(
+                                        modelData.token
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                QQC2.Button {
+                    text: "Back"
+                    icon.name: "go-previous"
+                    onClicked: pageStack.pop()
+                }
+            }
+        }
+    }
+
+        
+Component {
+    id: appearancePage
+
+    Kirigami.ScrollablePage {
+        objectName: "appearanceSettingsPage"
+        title: "Appearance"
+
+
+            Column {
+                width: parent.width
+                spacing: Kirigami.Units.largeSpacing
+
+                Kirigami.Heading {
+                    text: "Make CachyDrop yours"
+                    level: 2
+                }
+
+                QQC2.Label {
+                    text: "Choose how CachyDrop looks."
+                    opacity: 0.8
+                }
+
+                Kirigami.Heading {
+                    text: "Color theme"
+                    level: 3
+                }
+
+                QQC2.ComboBox {
+                    width: parent.width
+                    model: ["System", "Light", "Dark"]
+                    currentIndex: Math.max(0, model.indexOf(appSettings.theme))
+
+                    onActivated: appSettings.theme = currentText
+                }
+
+                Kirigami.Heading {
+                    text: "Accent color"
+                    level: 3
+                }
+
+                QQC2.ComboBox {
+                    width: parent.width
+                    model: ["Blue", "Violet", "Green", "Pink", "Orange"]
+                    currentIndex: Math.max(0, model.indexOf(appSettings.accent))
+
+                    onActivated: appSettings.accent = currentText
+                }
+
+                Kirigami.Heading {
+                    text: "Interface style"
+                    level: 3
+                }
+
+                QQC2.ComboBox {
+                    width: parent.width
+                    model: [
+                        "KDE Native",
+                        "AirDrop Inspired",
+                        "CachyOS"
+                    ]
+                    currentIndex: Math.max(0, model.indexOf(appSettings.style))
+
+                    onActivated: appSettings.style = currentText
+                }
+
+
+Kirigami.Heading {
+    text: "Transparency"
+    level: 3
+}
+
+QQC2.Switch {
+    text: "Enable window transparency"
+    checked: appSettings.transparencyEnabled
+    onToggled: appSettings.transparencyEnabled = checked
+}
+
+QQC2.Label {
+    text: "Window opacity: " +
+          Math.round(appSettings.windowOpacity * 100) + "%"
+}
+
+QQC2.Slider {
+    width: parent.width
+    from: 0.60
+    to: 1.0
+    stepSize: 0.05
+    value: appSettings.windowOpacity
+    enabled: appSettings.transparencyEnabled
+
+    onMoved: appSettings.windowOpacity = value
+}
+
+
+
+                Kirigami.InlineMessage {
+                    width: parent.width
+                    type: Kirigami.MessageType.Information
+                    text: "Your preferences are saved. Visual theme and style changes will be connected in the next step."
+                    visible: true
+                }
+
+                QQC2.Button {
+                    text: "Back"
+                    icon.name: "go-previous"
+                    onClicked: pageStack.pop()
                 }
             }
         }
