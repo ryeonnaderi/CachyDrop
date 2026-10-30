@@ -120,6 +120,7 @@ private:
     QHash<QString, TransferRequest> m_requests;
     QHash<QString, PairingRequest> m_pairings;
     QHash<QString, QString> m_sessions;
+    QHash<QString, QString> m_trustedDevices;
     QHash<QString, SharedFile> m_sharedFiles;
 
     void handleConnection();

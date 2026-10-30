@@ -18,6 +18,7 @@
 #include <QTimer>
 #include <QStringList>
 #include <qrencode.h>
+#include <QSettings>
 
 namespace {
 
@@ -106,7 +107,7 @@ const outgoing = document.querySelector('#outgoing');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const params = new URLSearchParams(location.search);
 const pairingToken = params.get('pair');
-let session = sessionStorage.getItem('cachydrop-session');
+let session = localStorage.getItem('cachydrop-session');
 
 async function jsonFetch(url, options) {
     const r = await fetch(url, options);
@@ -129,7 +130,7 @@ async function pairDevice() {
             return;
         }
 
-        sessionStorage.removeItem('cachydrop-session');
+        localStorage.removeItem('cachydrop-session');
         session = null;
     }
 
@@ -167,7 +168,7 @@ async function pairDevice() {
 
             if (state.state === 'approved') {
                 session = state.session;
-                sessionStorage.setItem('cachydrop-session', session);
+                localStorage.setItem('cachydrop-session', session);
                 history.replaceState(null, '', '/');
                 form.hidden = false;
                 outgoing.hidden = false;
@@ -323,7 +324,7 @@ const list = document.querySelector('#files');
 const selection = document.querySelector('#selection');
 const selectAll = document.querySelector('#selectAll');
 const download = document.querySelector('#download');
-const session = sessionStorage.getItem('cachydrop-session');
+const session = localStorage.getItem('cachydrop-session');
 
 function updateSelection() {
     const boxes = Array.from(
@@ -466,6 +467,18 @@ if (session) {
 ReceiverServer::ReceiverServer(QObject *parent)
     : QObject(parent)
 {
+    QSettings settings;
+    settings.beginGroup("trustedDevices");
+
+    for (const QString &token : settings.allKeys()) {
+        const QString device = settings.value(token).toString();
+
+        if (!token.isEmpty() && !device.isEmpty()) {
+            m_trustedDevices.insert(token, device);
+        }
+    }
+
+    settings.endGroup();
     connect(&m_server, &QTcpServer::newConnection,
             this, &ReceiverServer::handleConnection);
 
@@ -717,8 +730,16 @@ void ReceiverServer::approvePairing()
         return;
 
     it->state = "approved";
-    m_sessions.insert(it->sessionToken, it->device);
-    emit pairingRequestChanged();
+m_sessions.insert(it->sessionToken, it->device);
+m_trustedDevices.insert(it->sessionToken, it->device);
+
+QSettings settings;
+settings.beginGroup("trustedDevices");
+settings.setValue(it->sessionToken, it->device);
+settings.endGroup();
+settings.sync();
+
+emit pairingRequestChanged();
 }
 
 void ReceiverServer::rejectPairing()
@@ -860,9 +881,11 @@ void ReceiverServer::handleConnection()
                 return QJsonDocument::fromJson(body);
             };
 
-            auto authorized = [this](const QString &token) {
-                return !token.isEmpty() && m_sessions.contains(token);
-            };
+           auto authorized = [this](const QString &token) {
+    return !token.isEmpty() &&
+           (m_sessions.contains(token) ||
+            m_trustedDevices.contains(token));
+};
 
             if (method == "GET" && (path == "/" || path == "/index.html")) {
                 socket->write(response("200 OK", "text/html; charset=utf-8",
@@ -1049,7 +1072,7 @@ void ReceiverServer::handleConnection()
                     } else {
                         TransferRequest request;
                         request.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-                        request.sender = m_sessions.value(token);
+                        request.sender = m_sessions.value(token, m_trustedDevices.value(token));
                         request.sessionToken = token;
                         request.totalSize = 0;
                         request.state = "pending";
