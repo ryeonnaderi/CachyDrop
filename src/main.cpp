@@ -1,15 +1,18 @@
-
-#include <QGuiApplication>
+#include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QCoreApplication>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QUrl>
+#include <QStringList>
+#include <QWindow>
 
 #include "ReceiverServer.h"
 
 int main(int argc, char *argv[])
 {
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
 
     QGuiApplication::setApplicationName("CachyDrop");
     QGuiApplication::setOrganizationName("CachyDrop");
@@ -34,6 +37,8 @@ int main(int argc, char *argv[])
 
     if (engine.rootObjects().isEmpty())
         return -1;
+
+   
 
     QObject::connect(&app, &QCoreApplication::aboutToQuit,
                      &receiverServer, &ReceiverServer::stop);

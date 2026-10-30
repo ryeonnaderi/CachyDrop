@@ -19,6 +19,11 @@
 #include <QStringList>
 #include <qrencode.h>
 #include <QSettings>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QWindow>
+#include <QGuiApplication>
+#include <QDebug>
 
 namespace {
 
@@ -791,6 +796,28 @@ void ReceiverServer::expireRequests()
     if (pairingsChanged)
         emit pairingRequestChanged();
 }
+
+void ReceiverServer::openMultiFilePicker()
+{
+    QFileDialog dialog(nullptr, "Select files to send to your phone");
+
+    dialog.setFileMode(QFileDialog::ExistingFiles);
+    dialog.setAcceptMode(QFileDialog::AcceptOpen);
+    dialog.setOption(QFileDialog::DontUseNativeDialog, true);
+    dialog.setLabelText(QFileDialog::Accept, "Select files");
+
+    // Explicitly enable multi-file selection in the file list.
+    dialog.setViewMode(QFileDialog::Detail);
+
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const QStringList paths = dialog.selectedFiles();
+
+      if (!paths.isEmpty())
+        shareFiles(paths);
+}
+
 
 void ReceiverServer::handleConnection()
 {

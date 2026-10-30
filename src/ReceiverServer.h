@@ -8,6 +8,7 @@
 #include <QHash>
 #include <QDateTime>
 #include <QVector>
+#include <QVariant>
 
 class ReceiverServer : public QObject
 {
@@ -41,6 +42,7 @@ class ReceiverServer : public QObject
 
 public:
     explicit ReceiverServer(QObject *parent = nullptr);
+    Q_INVOKABLE void openMultiFilePicker();
 
     bool running() const;
     QString address() const;

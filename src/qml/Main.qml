@@ -1,17 +1,16 @@
 
 import QtQuick
 import QtQuick.Controls as QQC2
-import QtQuick.Dialogs
 import org.kde.kirigami as Kirigami
 
 Kirigami.ApplicationWindow {
     id: root
 
     title: "CachyDrop"
-    width: 760
-    height: 700
-    minimumWidth: 600
-    minimumHeight: 560
+    width: 900
+    height: 760
+    minimumWidth: 680
+    minimumHeight: 600
     visible: true
 
     Connections {
@@ -45,10 +44,10 @@ Kirigami.ApplicationWindow {
             Column {
                 id: mainColumn
 
-                width: Math.min(parent.width - 40, 480)
+                width: Math.min(parent.width - 64, 680)
                 x: Math.round((parent.width - width) / 2)
                 y: Kirigami.Units.largeSpacing
-                spacing: Kirigami.Units.largeSpacing
+                spacing: Kirigami.Units.gridUnit
 
                 Kirigami.Heading {
                     width: parent.width
@@ -59,13 +58,55 @@ Kirigami.ApplicationWindow {
 
                 QQC2.Label {
                     width: parent.width
-                    text: receiverServer.running
-                          ? "●  Receiving service is running"
-                          : "Ready to receive files"
+                    text: "Send files between your phone and computer"
                     horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    opacity: 0.8
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 52
+                    radius: 12
+
                     color: receiverServer.running
-                           ? Kirigami.Theme.positiveTextColor
-                           : Kirigami.Theme.textColor
+                           ? "#183b2c"
+                           : Kirigami.Theme.alternateBackgroundColor
+
+                    border.width: 1
+                    border.color: receiverServer.running
+                                  ? "#287a50"
+                                  : Kirigami.Theme.disabledTextColor
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 10
+
+                        Rectangle {
+                            width: 10
+                            height: 10
+                            radius: 5
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            color: receiverServer.running
+                                   ? "#4ade80"
+                                   : Kirigami.Theme.disabledTextColor
+                        }
+
+                        QQC2.Label {
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            text: receiverServer.running
+                                  ? "Receiving service is active"
+                                  : "Receiving service is stopped"
+
+                            color: receiverServer.running
+                                   ? "#bbf7d0"
+                                   : Kirigami.Theme.textColor
+
+                            font.weight: Font.DemiBold
+                        }
+                    }
                 }
 
                 QQC2.Button {
@@ -91,8 +132,7 @@ Kirigami.ApplicationWindow {
                     id: connectionCard
 
                     width: parent.width
-                    height: connectionColumn.implicitHeight
-                            + Kirigami.Units.largeSpacing * 2
+                    height: connectionColumn.implicitHeight + 32
                     radius: 16
                     color: Kirigami.Theme.backgroundColor
                     border.width: 1
@@ -242,8 +282,7 @@ Kirigami.ApplicationWindow {
                     id: transferCard
 
                     width: parent.width
-                    height: transferColumn.implicitHeight
-                            + Kirigami.Units.largeSpacing * 2
+                    height: transferColumn.implicitHeight + 32
                     radius: 16
                     color: Kirigami.Theme.backgroundColor
                     border.width: 1
@@ -270,32 +309,131 @@ Kirigami.ApplicationWindow {
                             opacity: 0.8
                         }
 
-                        QQC2.Button {
+                        Rectangle {
+                            id: dropZone
+
                             width: parent.width
-                            text: "Select files to send to phone"
-                            icon.name: "document-send"
-                            enabled: receiverServer.running
-                            highlighted: true
-                            onClicked: fileDialog.open()
+                            height: 132
+                            radius: 12
+
+                            color: dropArea.containsDrag
+                                   ? Kirigami.Theme.alternateBackgroundColor
+                                   : "transparent"
+
+                            border.width: 2
+                            border.color: dropArea.containsDrag
+                                          ? Kirigami.Theme.highlightColor
+                                          : Kirigami.Theme.disabledTextColor
+
+                            opacity: receiverServer.running ? 1.0 : 0.55
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: Kirigami.Units.smallSpacing
+
+                                Kirigami.Icon {
+                                    source: "document-import"
+                                    width: 32
+                                    height: 32
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+
+                                QQC2.Label {
+                                    text: dropArea.containsDrag
+                                          ? "Drop files here"
+                                          : "Drag and drop files here"
+                                    font.weight: Font.DemiBold
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+
+                                QQC2.Label {
+                                    text: "Or use the button below to browse"
+                                    opacity: 0.75
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+                            }
+
+                            DropArea {
+                                id: dropArea
+                                anchors.fill: parent
+                                enabled: receiverServer.running
+
+                                onDropped: function(drop) {
+                                    const paths = []
+
+                                    for (let i = 0; i < drop.urls.length; ++i) {
+                                        const url = String(drop.urls[i])
+
+                                        if (url.startsWith("file://")) {
+                                            let path = url.replace(/^file:\/\/+/, "/")
+
+                                            try {
+                                                path = decodeURIComponent(path)
+                                            } catch (error) {
+                                                // Keep original path if decoding fails.
+                                            }
+
+                                            paths.push(path)
+                                        }
+                                    }
+
+                                    if (paths.length === 0) {
+                                        shareStatus.text =
+                                            "No local files were found in that drop."
+                                        return
+                                    }
+
+                                    const count = receiverServer.shareFiles(paths)
+
+                                    shareStatus.text = count > 0
+                                        ? count + " file(s) ready to download on your phone."
+                                        : "No files could be shared. Check file permissions."
+                                }
+                            }
                         }
-                        QQC2.Label {
-    id: shareStatus
+
+                        QQC2.Button {
     width: parent.width
-    text: ""
-    wrapMode: Text.Wrap
-    horizontalAlignment: Text.AlignHCenter
+    text: "Select files to send to phone"
+    icon.name: "document-send"
+    enabled: receiverServer.running
+    highlighted: true
+
+    onClicked: receiverServer.openMultiFilePicker()
 }
 
                         QQC2.Label {
+                            id: shareStatus
                             width: parent.width
+                            text: ""
+                            wrapMode: Text.Wrap
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+
                             text: receiverServer.sharedFileCount === 0
                                   ? "No outgoing files selected"
                                   : receiverServer.sharedFileCount
-                                    + " file(s) available to download"
+                                    + (receiverServer.sharedFileCount === 1
+                                       ? " file ready to send"
+                                       : " files ready to send")
+
                             visible: receiverServer.running
                             wrapMode: Text.Wrap
                             horizontalAlignment: Text.AlignHCenter
-                            opacity: 0.8
+
+                            font.pixelSize: 20
+                            font.weight: Font.DemiBold
+
+                            color: receiverServer.sharedFileCount > 0
+                                   ? Kirigami.Theme.positiveTextColor
+                                   : Kirigami.Theme.disabledTextColor
+                        }
+
+                        Kirigami.Separator {
+                            width: parent.width
                         }
 
                         QQC2.Label {
@@ -303,38 +441,13 @@ Kirigami.ApplicationWindow {
                             text: "Incoming transfers require your approval."
                             wrapMode: Text.Wrap
                             horizontalAlignment: Text.AlignHCenter
-                            opacity: 0.8
+                            font.weight: Font.Medium
                         }
                     }
                 }
             }
         }
     }
-
-   FileDialog {
-    id: fileDialog
-
-    title: "Select files to send to your phone"
-    fileMode: FileDialog.OpenFiles
-    options: FileDialog.DontUseNativeDialog
-
-    onAccepted: {
-        const paths = selectedFiles
-            .map(file => String(file).replace(/^file:\/\/+/, "/"))
-            .filter(path => path.length > 0)
-
-        if (paths.length === 0) {
-            shareStatus.text = "No files selected."
-            return
-        }
-
-        const count = receiverServer.shareFiles(paths)
-
-        shareStatus.text = count > 0
-            ? count + " file(s) ready to download on your phone."
-            : "No files could be shared. Check file permissions and make sure receiving is running."
-    }
-}
 
     QQC2.Dialog {
         id: errorDialog
@@ -351,7 +464,6 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // Device pairing approval — separate from file-transfer approval.
     QQC2.Dialog {
         id: pairingDialog
         parent: root.overlay
@@ -412,7 +524,6 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    // Incoming file-transfer approval remains separate.
     QQC2.Dialog {
         id: approvalDialog
         parent: root.overlay
@@ -433,21 +544,20 @@ Kirigami.ApplicationWindow {
             }
 
             QQC2.Label {
-    width: parent.width
-    text: "Files (" + receiverServer.pendingFileCount + "):\n"
-          + receiverServer.pendingFilenames.join("\n")
-    wrapMode: Text.Wrap
-    font.bold: true
-}
+                width: parent.width
+                text: "Files (" + receiverServer.pendingFileCount + "):\n"
+                      + receiverServer.pendingFilenames.join("\n")
+                wrapMode: Text.Wrap
+                font.bold: true
+            }
 
-QQC2.Label {
-    width: parent.width
-    text: "Total size: "
-          + (receiverServer.pendingSize / (1024 * 1024)).toFixed(2)
-          + " MiB"
-    wrapMode: Text.Wrap
-}
-
+            QQC2.Label {
+                width: parent.width
+                text: "Total size: "
+                      + (receiverServer.pendingSize / (1024 * 1024)).toFixed(2)
+                      + " MiB"
+                wrapMode: Text.Wrap
+            }
 
             QQC2.Label {
                 width: parent.width

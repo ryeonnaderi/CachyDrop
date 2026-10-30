@@ -11,6 +11,8 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     Qml
     QuickControls2
     Network
+    Quick
+    Widgets
 )
 
 find_package(KF6Kirigami REQUIRED)
@@ -38,6 +40,7 @@ target_link_libraries(cachydrop PRIVATE
     Qt6::Qml
     Qt6::QuickControls2
     Qt6::Network
+    Qt6::Widgets
     KF6::Kirigami
     PkgConfig::QRENCODE
 )
