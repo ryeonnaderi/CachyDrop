@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QVector>
 #include <QVariant>
+#include "PairingManager.h"
 
 class ReceiverServer : public QObject
 {
@@ -99,14 +100,6 @@ private:
         QDateTime expiresAt;
     };
 
-    struct PairingRequest {
-        QString id;
-        QString device;
-        QString sessionToken;
-        QString state;
-        QDateTime expiresAt;
-    };
-
     struct SharedFile {
         QString id;
         QString path;
@@ -115,22 +108,17 @@ private:
     };
 
     QTcpServer m_server;
+    PairingManager m_pairingManager;
 
     QString m_address;
     QString m_pairingCode;
-    QString m_pairingToken;
-
     QString m_activeRequestId;
-    QString m_activePairingId;
-
     QStringList m_qrRows;
 
     QHash<QString, TransferRequest> m_requests;
-    QHash<QString, PairingRequest> m_pairings;
-    QHash<QString, QString> m_sessions;
-    QHash<QString, QString> m_trustedDevices;
     QHash<QString, SharedFile> m_sharedFiles;
 
     void handleConnection();
     void expireRequests();
 };
+

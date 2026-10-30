@@ -11,7 +11,6 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     Qml
     QuickControls2
     Network
-    Quick
     Widgets
 )
 
@@ -19,6 +18,7 @@ find_package(KF6Kirigami REQUIRED)
 find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(QRENCODE REQUIRED IMPORTED_TARGET libqrencode)
+pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -26,6 +26,20 @@ qt_add_executable(cachydrop
     src/main.cpp
     src/ReceiverServer.cpp
     src/ReceiverServer.h
+    src/WebPages.h
+    src/WebPages.cpp
+    src/HttpUtils.h
+    src/HttpUtils.cpp
+    src/TransferUtils.h
+    src/TransferUtils.cpp
+    src/PairingManager.cpp
+    src/PairingManager.h
+    src/Network.h 
+    src/Network.cpp
+    src/QrCodeUtils.h
+    src/QrCodeUtils.cpp
+    src/HttpRequestParser.h
+    src/HttpRequestParser.cpp
 )
 
 qt_add_qml_module(cachydrop
@@ -43,6 +57,7 @@ target_link_libraries(cachydrop PRIVATE
     Qt6::Widgets
     KF6::Kirigami
     PkgConfig::QRENCODE
+    PkgConfig::SODIUM
 )
 
 install(TARGETS cachydrop

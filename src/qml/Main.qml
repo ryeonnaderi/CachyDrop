@@ -2,8 +2,10 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
-import Qt.labs.settings
+import QtCore
 import QtQuick.Layouts
+
+
 Kirigami.ApplicationWindow {
     id: root
     property int selectedPage: 0
@@ -84,11 +86,10 @@ Kirigami.ApplicationWindow {
       
 
         Flickable {
-            anchors.fill: parent
-            contentWidth: width
-            contentHeight: mainColumn.implicitHeight
-                           + Kirigami.Units.largeSpacing * 2
-            clip: true
+    contentWidth: width
+    contentHeight: mainColumn.implicitHeight
+                   + Kirigami.Units.largeSpacing * 2
+    clip: true
 
             Column {
                 id: mainColumn
