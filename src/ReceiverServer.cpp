@@ -16,11 +16,14 @@
 #include <QUuid>
 #include <QTcpSocket>
 #include <QTimer>
+#include <QStringList>
 #include <qrencode.h>
 
 namespace {
 
 constexpr qint64 MaxUploadSize = 100LL * 1024 * 1024;
+constexpr qint64 MaxBatchSize = 100LL * 1024 * 1024;
+constexpr int MaxBatchFiles = 20;
 constexpr int RequestLifetimeSeconds = 120;
 
 QString newToken()
@@ -83,9 +86,9 @@ progress{width:100%;margin-top:12px}
 <p id="status" role="status" aria-live="polite">Connecting to CachyDrop…</p>
 
 <form id="form" hidden>
-<label for="file">File to send</label>
-<input id="file" type="file" required>
-<button id="send">Request transfer</button>
+<label for="file">Files to send (up to 20 files, 100 MiB total)</label>
+<input id="file" type="file" multiple required>
+<button id="send">Request batch approval</button>
 </form>
 
 <p><a id="outgoing" href="/outgoing-page" hidden>
@@ -185,8 +188,13 @@ async function pairDevice() {
 form.addEventListener('submit', async event => {
     event.preventDefault();
 
-    const file = fileInput.files[0];
-    if (!file || !session) return;
+    const files = Array.from(fileInput.files);
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    if (!files.length || !session) return;
+    if (files.length > 20 || totalSize > 100 * 1024 * 1024) {
+        status.textContent = "Select at most 20 files totaling no more than 100 MiB.";
+        return;
+    }
 
     send.disabled = true;
     progress.value = 0;
@@ -199,8 +207,7 @@ form.addEventListener('submit', async event => {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 session,
-                filename: file.name,
-                size: file.size
+                files: files.map(file => ({ filename: file.name, size: file.size }))
             })
         });
 
@@ -228,10 +235,10 @@ form.addEventListener('submit', async event => {
 
         if (!approved) throw new Error('Approval timed out');
 
-        status.textContent = 'Approved. Uploading file…';
+        status.textContent = 'Approved. Uploading files…';
 
         const data = new FormData();
-        data.append('file', file, file.name);
+        for (const file of files) data.append('files', file, file.name);
 
         await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
@@ -257,7 +264,7 @@ form.addEventListener('submit', async event => {
             xhr.send(data);
         });
 
-        status.textContent = 'File received successfully!';
+        status.textContent = files.length === 1 ? 'File received successfully!' : `${files.length} files received successfully!`;
         progress.value = 100;
         fileInput.value = '';
     } catch (error) {
@@ -285,9 +292,13 @@ QByteArray outgoingHtmlPage()
 body{font:16px system-ui;max-width:540px;margin:8vh auto;padding:16px}
 main{border:1px solid #8885;border-radius:20px;padding:24px}
 button{box-sizing:border-box;width:100%;margin-top:14px;padding:13px}
-li{margin:18px 0;overflow-wrap:anywhere}
-a{overflow-wrap:anywhere}
+li{list-style:none;margin:14px 0;padding:12px;border:1px solid #8885;border-radius:10px}
+.file-row{display:flex;align-items:flex-start;gap:12px}
+.file-row input{width:auto;margin-top:5px;flex-shrink:0}
+.file-name{overflow-wrap:anywhere}
+.file-size{font-size:.9em;opacity:.75}
 #status{overflow-wrap:anywhere}
+a{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -295,18 +306,53 @@ a{overflow-wrap:anywhere}
 <h1>Get files from CachyDrop</h1>
 <p id="status">Checking device pairing…</p>
 <button id="load" hidden>Show available files</button>
+<div id="selection" hidden>
+<label>
+<input type="checkbox" id="selectAll">
+Select all files
+</label>
 <ul id="files"></ul>
+<button id="download" disabled>Download selected</button>
+</div>
 <p><a href="/">Back to sending files to the computer</a></p>
 </main>
 <script>
 const load = document.querySelector('#load');
 const status = document.querySelector('#status');
 const list = document.querySelector('#files');
+const selection = document.querySelector('#selection');
+const selectAll = document.querySelector('#selectAll');
+const download = document.querySelector('#download');
 const session = sessionStorage.getItem('cachydrop-session');
+
+function updateSelection() {
+    const boxes = Array.from(
+        list.querySelectorAll('input[type="checkbox"][data-id]')
+    );
+    const checked = boxes.filter(box => box.checked);
+    download.disabled = checked.length === 0;
+    selectAll.checked = boxes.length > 0 && checked.length === boxes.length;
+    selectAll.indeterminate =
+        checked.length > 0 && checked.length < boxes.length;
+}
+
+selectAll.addEventListener('change', () => {
+    list.querySelectorAll('input[type="checkbox"][data-id]')
+        .forEach(box => box.checked = selectAll.checked);
+    updateSelection();
+});
+
+list.addEventListener('change', event => {
+    if (event.target.matches('input[type="checkbox"][data-id]'))
+        updateSelection();
+});
 
 load.addEventListener('click', async () => {
     load.disabled = true;
     list.replaceChildren();
+    selection.hidden = true;
+    selectAll.checked = false;
+    selectAll.indeterminate = false;
     status.textContent = 'Loading available files…';
 
     try {
@@ -318,7 +364,8 @@ load.addEventListener('click', async () => {
         });
 
         const result = await r.json();
-        if (!r.ok) throw new Error(result.error || 'Could not list files');
+        if (!r.ok)
+            throw new Error(result.error || 'Could not list files');
 
         if (!result.files.length) {
             status.textContent =
@@ -326,26 +373,65 @@ load.addEventListener('click', async () => {
             return;
         }
 
-        status.textContent = 'Tap a file to download it to your phone.';
-
         for (const file of result.files) {
             const item = document.createElement('li');
-            const link = document.createElement('a');
+            const row = document.createElement('label');
+            const checkbox = document.createElement('input');
             const details = document.createElement('div');
+            const name = document.createElement('div');
+            const size = document.createElement('div');
 
-            link.href = '/download?id=' + encodeURIComponent(file.id) +
-                '&session=' + encodeURIComponent(session);
-            link.textContent = file.filename;
-            details.textContent =
+            row.className = 'file-row';
+            checkbox.type = 'checkbox';
+            checkbox.dataset.id = file.id;
+            checkbox.dataset.filename = file.filename;
+
+            name.className = 'file-name';
+            name.textContent = file.filename;
+            size.className = 'file-size';
+            size.textContent =
                 (file.size / (1024 * 1024)).toFixed(2) + ' MiB';
 
-            item.append(link, details);
+            details.append(name, size);
+            row.append(checkbox, details);
+            item.append(row);
             list.append(item);
         }
+
+        selection.hidden = false;
+        status.textContent =
+            result.files.length + ' file(s) available. Select what to download.';
+        updateSelection();
     } catch (error) {
         status.textContent = 'Error: ' + error.message;
     } finally {
         load.disabled = false;
+    }
+});
+
+download.addEventListener('click', () => {
+    const selected = Array.from(
+        list.querySelectorAll('input[type="checkbox"][data-id]:checked')
+    );
+
+    if (!selected.length)
+        return;
+
+    status.textContent =
+        'Starting ' + selected.length +
+        ' download(s). Your browser may ask permission for multiple downloads.';
+
+    // Each selected file is downloaded separately.
+    // A browser may require permission for multiple automatic downloads.
+    for (const box of selected) {
+        const link = document.createElement('a');
+        link.href = '/download?id=' + encodeURIComponent(box.dataset.id) +
+            '&session=' + encodeURIComponent(session);
+        link.download = box.dataset.filename || '';
+        link.hidden = true;
+        document.body.append(link);
+        link.click();
+        link.remove();
     }
 });
 
@@ -354,17 +440,21 @@ if (session) {
         headers: {'Authorization': 'Bearer ' + session},
         cache: 'no-store'
     }).then(r => {
-        if (!r.ok) throw new Error('Device is not paired');
+        if (!r.ok)
+            throw new Error('Device is not paired');
         return r.json();
     }).then(data => {
-        if (!data.valid) throw new Error('Device is not paired');
+        if (!data.valid)
+            throw new Error('Device is not paired');
         status.textContent = 'Connected to CachyDrop.';
         load.hidden = false;
     }).catch(error => {
-        status.textContent = error.message + '. Return to the main page and pair again.';
+        status.textContent =
+            error.message + '. Return to the main page and pair again.';
     });
 } else {
-    status.textContent = 'No paired device. Scan the desktop QR code first.';
+    status.textContent =
+        'No paired device. Scan the desktop QR code first.';
 }
 </script>
 </body>
@@ -414,12 +504,32 @@ bool ReceiverServer::hasPendingRequest() const
 
 QString ReceiverServer::pendingFilename() const
 {
-    return m_requests.value(m_activeRequestId).filename;
+    const auto it = m_requests.constFind(m_activeRequestId);
+    if (it == m_requests.cend() || it->files.isEmpty())
+        return {};
+    return it->files.first().filename;
+}
+
+QStringList ReceiverServer::pendingFilenames() const
+{
+    QStringList names;
+    const auto it = m_requests.constFind(m_activeRequestId);
+    if (it == m_requests.cend())
+        return names;
+    for (const TransferFile &file : it->files)
+        names.append(file.filename);
+    return names;
+}
+
+int ReceiverServer::pendingFileCount() const
+{
+    const auto it = m_requests.constFind(m_activeRequestId);
+    return it == m_requests.cend() ? 0 : it->files.size();
 }
 
 qint64 ReceiverServer::pendingSize() const
 {
-    return m_requests.value(m_activeRequestId).size;
+    return m_requests.value(m_activeRequestId).totalSize;
 }
 
 QString ReceiverServer::pendingSender() const
@@ -704,7 +814,7 @@ void ReceiverServer::handleConnection()
             }
 
             if (contentLength < 0 ||
-                contentLength > MaxUploadSize + 1024 * 1024) {
+                contentLength > MaxBatchSize + 2 * 1024 * 1024) {
                 socket->setProperty("requestProcessed", true);
                 socket->write(response("413 Content Too Large",
                                         "text/plain", "Upload too large"));
@@ -922,22 +1032,16 @@ void ReceiverServer::handleConnection()
 
             } else if (method == "POST" && path == "/request") {
                 const QJsonDocument doc = readJson();
-
                 if (!doc.isObject()) {
                     sendJson("400 Bad Request", {{"error", "Invalid request"}});
                 } else {
                     const QJsonObject obj = doc.object();
                     const QString token = obj.value("session").toString();
-                    const QString filename = safeFilename(obj.value("filename").toString());
-                    const double rawSize = obj.value("size").toDouble(-1);
-                    const qint64 size = static_cast<qint64>(rawSize);
-
+                    const QJsonArray filesArray = obj.value("files").toArray();
                     if (!authorized(token)) {
                         sendJson("403 Forbidden", {{"error", "Device is not paired"}});
-                    } else if (filename.isEmpty() || rawSize < 0 ||
-                               rawSize > MaxUploadSize ||
-                               static_cast<double>(size) != rawSize) {
-                        sendJson("400 Bad Request", {{"error", "Invalid filename or file size"}});
+                    } else if (filesArray.isEmpty() || filesArray.size() > MaxBatchFiles) {
+                        sendJson("400 Bad Request", {{"error", "Select between 1 and 20 files"}});
                     } else if (hasPendingRequest() ||
                                (m_requests.contains(m_activeRequestId) &&
                                 m_requests.value(m_activeRequestId).state == "approved")) {
@@ -945,19 +1049,36 @@ void ReceiverServer::handleConnection()
                     } else {
                         TransferRequest request;
                         request.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-                        request.filename = filename;
                         request.sender = m_sessions.value(token);
                         request.sessionToken = token;
-                        request.size = size;
+                        request.totalSize = 0;
                         request.state = "pending";
-                        request.expiresAt = QDateTime::currentDateTimeUtc()
-                                                 .addSecs(RequestLifetimeSeconds);
-
-                        m_requests.insert(request.id, request);
-                        m_activeRequestId = request.id;
-
-                        emit pendingRequestChanged();
-                        sendJson("200 OK", {{"id", request.id}});
+                        request.expiresAt = QDateTime::currentDateTimeUtc().addSecs(RequestLifetimeSeconds);
+                        bool valid = true;
+                        for (const QJsonValue &value : filesArray) {
+                            if (!value.isObject()) { valid = false; break; }
+                            const QJsonObject fileObj = value.toObject();
+                            const QString filename = safeFilename(fileObj.value("filename").toString());
+                            const QJsonValue sizeValue = fileObj.value("size");
+                            if (filename.isEmpty() || !sizeValue.isDouble()) { valid = false; break; }
+                            const double rawSize = sizeValue.toDouble(-1);
+                            if (rawSize < 0 || rawSize > MaxBatchSize) { valid = false; break; }
+                            const qint64 size = static_cast<qint64>(rawSize);
+                            if (static_cast<double>(size) != rawSize || size > MaxBatchSize - request.totalSize) { valid = false; break; }
+                            TransferFile file;
+                            file.filename = filename;
+                            file.size = size;
+                            request.files.append(file);
+                            request.totalSize += size;
+                        }
+                        if (!valid) {
+                            sendJson("400 Bad Request", {{"error", "Invalid file list or batch exceeds 100 MiB"}});
+                        } else {
+                            m_requests.insert(request.id, request);
+                            m_activeRequestId = request.id;
+                            emit pendingRequestChanged();
+                            sendJson("200 OK", {{"id", request.id}});
+                        }
                     }
                 }
 
@@ -983,112 +1104,94 @@ void ReceiverServer::handleConnection()
                 const QString id = query.queryItemValue("id");
                 const QString token = query.queryItemValue("session");
                 auto it = m_requests.find(id);
-
                 if (!authorized(token) || it == m_requests.end() ||
                     it->sessionToken != token || it->state != "approved" ||
                     it->expiresAt <= QDateTime::currentDateTimeUtc()) {
                     sendJson("403 Forbidden", {{"error", "Transfer was not approved"}});
                 } else {
                     QByteArray contentType;
-
                     for (const QByteArray &line : lines) {
                         const QByteArray trimmed = line.trimmed();
                         const qsizetype colon = trimmed.indexOf(':');
-
-                        if (colon >= 0 &&
-                            trimmed.left(colon).trimmed().toLower() == "content-type")
+                        if (colon >= 0 && trimmed.left(colon).trimmed().toLower() == "content-type")
                             contentType = trimmed.mid(colon + 1).trimmed();
                     }
-
-                    const QRegularExpression boundaryRegex(
-                        R"regex(boundary=(?:"([^"]+)"|([^;\s]+)))regex");
+                    const QRegularExpression boundaryRegex(R"regex(boundary=(?:"([^"]+)"|([^;\s]+)))regex");
                     const auto match = boundaryRegex.match(QString::fromLatin1(contentType));
-
-                    if (!contentType.toLower().startsWith("multipart/form-data") ||
-                        !match.hasMatch()) {
+                    if (!contentType.toLower().startsWith("multipart/form-data") || !match.hasMatch()) {
                         sendJson("400 Bad Request", {{"error", "Expected multipart upload"}});
                     } else {
-                        const QByteArray boundary =
-                            (match.captured(1).isEmpty()
-                                ? match.captured(2) : match.captured(1)).toLatin1();
-
-                        const QByteArray marker = "\r\n--" + boundary;
-                        const qsizetype partHeadersEnd = body.indexOf("\r\n\r\n");
-                        const qsizetype dataEnd = body.lastIndexOf(marker);
-
-                        const QByteArray partHeaders = partHeadersEnd >= 0
-                            ? body.left(partHeadersEnd) : QByteArray();
-
-                        const QRegularExpression filenameRegex(
-                            R"regex(filename="([^"]*)")regex");
-                        const auto filenameMatch = filenameRegex.match(
-                            QString::fromLatin1(partHeaders));
-
-                        if (partHeadersEnd < 0 ||
-                            dataEnd < partHeadersEnd + 4 ||
-                            !partHeaders.contains("name=\"file\"") ||
-                            !filenameMatch.hasMatch()) {
-                            sendJson("400 Bad Request", {{"error", "Invalid file upload"}});
+                        const QByteArray boundary = (match.captured(1).isEmpty() ? match.captured(2) : match.captured(1)).toLatin1();
+                        const QByteArray delimiter = "--" + boundary;
+                        struct IncomingFile { QString filename; QByteArray data; };
+                        QVector<IncomingFile> incoming;
+                        qsizetype pos = body.indexOf(delimiter);
+                        bool valid = pos >= 0;
+                        while (valid && pos >= 0) {
+                            pos += delimiter.size();
+                            if (body.mid(pos, 2) == "--") break;
+                            if (body.mid(pos, 2) == "\r\n") pos += 2;
+                            const qsizetype headersEnd = body.indexOf("\r\n\r\n", pos);
+                            if (headersEnd < 0) { valid = false; break; }
+                            const QByteArray partHeaders = body.mid(pos, headersEnd - pos);
+                            const qsizetype dataStart = headersEnd + 4;
+                            const qsizetype next = body.indexOf("\r\n" + delimiter, dataStart);
+                            if (next < 0) { valid = false; break; }
+                            const QRegularExpression nameRegex(R"regex(name="([^"]*)")regex");
+                            const QRegularExpression filenameRegex(R"regex(filename="([^"]*)")regex");
+                            const auto nameMatch = nameRegex.match(QString::fromLatin1(partHeaders));
+                            const auto filenameMatch = filenameRegex.match(QString::fromLatin1(partHeaders));
+                            if (!nameMatch.hasMatch() || nameMatch.captured(1) != "files" || !filenameMatch.hasMatch()) { valid = false; break; }
+                            IncomingFile f;
+                            f.filename = safeFilename(QUrl::fromPercentEncoding(filenameMatch.captured(1).toUtf8()));
+                            f.data = body.mid(dataStart, next - dataStart);
+                            if (f.filename.isEmpty()) { valid = false; break; }
+                            incoming.append(f);
+                            pos = next + 2;
+                        }
+                        if (!valid || incoming.size() != it->files.size()) {
+                            sendJson("400 Bad Request", {{"error", "Uploaded file list does not match approval"}});
                         } else {
-                            const QString filename = safeFilename(
-                                QUrl::fromPercentEncoding(filenameMatch.captured(1).toUtf8()));
-
-                            const QByteArray fileData = body.mid(
-                                partHeadersEnd + 4,
-                                dataEnd - partHeadersEnd - 4);
-
-                            if (filename != it->filename ||
-                                fileData.size() != it->size ||
-                                fileData.size() > MaxUploadSize) {
-                                sendJson("400 Bad Request", {
-                                    {"error", "File details did not match approval"}
-                                });
+                            qint64 total = 0;
+                            for (int i = 0; i < incoming.size(); ++i) {
+                                if (incoming[i].filename != it->files[i].filename || incoming[i].data.size() != it->files[i].size || incoming[i].data.size() > MaxBatchSize - total) { valid = false; break; }
+                                total += incoming[i].data.size();
+                            }
+                            if (!valid || total != it->totalSize) {
+                                sendJson("400 Bad Request", {{"error", "File details did not match approval"}});
                             } else {
-                                const QString folder = QDir::homePath()
-                                    + QStringLiteral("/Downloads/CachyDrop");
-
+                                const QString folder = QDir::homePath() + QStringLiteral("/Downloads/CachyDrop");
                                 if (!QDir().mkpath(folder)) {
-                                    sendJson("500 Internal Server Error", {
-                                        {"error", "Cannot create destination folder"}
-                                    });
+                                    sendJson("500 Internal Server Error", {{"error", "Cannot create destination folder"}});
                                 } else {
-                                    QString destination = folder + "/" + filename;
-
-                                    if (QFileInfo::exists(destination)) {
-                                        const QFileInfo info(filename);
-                                        const QString base = info.completeBaseName();
-                                        const QString suffix = info.completeSuffix().isEmpty()
-                                            ? QString() : "." + info.completeSuffix();
-                                        int index = 1;
-
-                                        do {
-                                            destination = folder + "/" + base
-                                                + QStringLiteral(" (%1)").arg(index++)
-                                                + suffix;
-                                        } while (QFileInfo::exists(destination));
+                                    QVector<QString> written;
+                                    bool saved = true;
+                                    QString failedName;
+                                    for (const IncomingFile &f : incoming) {
+                                        QString destination = folder + "/" + f.filename;
+                                        if (QFileInfo::exists(destination)) {
+                                            const QFileInfo info(f.filename);
+                                            const QString base = info.completeBaseName();
+                                            const QString suffix = info.completeSuffix().isEmpty() ? QString() : "." + info.completeSuffix();
+                                            int index = 1;
+                                            do { destination = folder + "/" + base + QStringLiteral(" (%1)").arg(index++) + suffix; } while (QFileInfo::exists(destination));
+                                        }
+                                        QFile output(destination);
+                                        if (!output.open(QIODevice::WriteOnly) || output.write(f.data) != f.data.size()) {
+                                            output.close(); QFile::remove(destination); saved = false; failedName = f.filename; break;
+                                        }
+                                        output.close(); written.append(destination);
                                     }
-
-                                    QFile output(destination);
-
-                                    if (!output.open(QIODevice::WriteOnly) ||
-                                        output.write(fileData) != fileData.size()) {
-                                        output.close();
-                                        QFile::remove(destination);
-                                        sendJson("500 Internal Server Error", {
-                                            {"error", "Could not save file"}
-                                        });
+                                    if (!saved) {
+                                        for (const QString &path : written) QFile::remove(path);
+                                        sendJson("500 Internal Server Error", {{"error", "Could not save all files; batch rolled back"}, {"filename", failedName}});
                                     } else {
-                                        output.close();
                                         it->state = "uploaded";
-                                        it->expiresAt = QDateTime::currentDateTimeUtc()
-                                                            .addSecs(30);
-
-                                        socket->write(response("200 OK",
-                                            "text/html; charset=utf-8",
-                                            "<!doctype html><meta charset=utf-8>"
-                                            "<h1>File received!</h1><p>"
-                                            + filename.toHtmlEscaped().toUtf8()
-                                            + "</p><a href=\"/\">Send another file</a>"));
+                                        it->expiresAt = QDateTime::currentDateTimeUtc().addSecs(30);
+                                        QStringList names;
+                                        for (const IncomingFile &f : incoming) names.append(f.filename);
+                                        socket->write(response("200 OK", "text/html; charset=utf-8",
+                                            "<!doctype html><meta charset=utf-8><h1>Files received!</h1><p>" + names.join(", ").toHtmlEscaped().toUtf8() + "</p><a href=\"/\">Send more files</a>"));
                                     }
                                 }
                             }

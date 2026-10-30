@@ -7,6 +7,7 @@
 #include <QStringList>
 #include <QHash>
 #include <QDateTime>
+#include <QVector>
 
 class ReceiverServer : public QObject
 {
@@ -21,7 +22,11 @@ class ReceiverServer : public QObject
                NOTIFY pendingRequestChanged)
     Q_PROPERTY(QString pendingFilename READ pendingFilename
                NOTIFY pendingRequestChanged)
+    Q_PROPERTY(QStringList pendingFilenames READ pendingFilenames
+               NOTIFY pendingRequestChanged)
     Q_PROPERTY(qint64 pendingSize READ pendingSize
+               NOTIFY pendingRequestChanged)
+    Q_PROPERTY(int pendingFileCount READ pendingFileCount
                NOTIFY pendingRequestChanged)
     Q_PROPERTY(QString pendingSender READ pendingSender
                NOTIFY pendingRequestChanged)
@@ -44,7 +49,9 @@ public:
 
     bool hasPendingRequest() const;
     QString pendingFilename() const;
+    QStringList pendingFilenames() const;
     qint64 pendingSize() const;
+    int pendingFileCount() const;
     QString pendingSender() const;
 
     bool hasPendingPairing() const;
@@ -56,11 +63,9 @@ public:
     Q_INVOKABLE bool start();
     Q_INVOKABLE void stop();
 
-    // Incoming file-transfer approval.
     Q_INVOKABLE void approveRequest();
     Q_INVOKABLE void rejectRequest();
 
-    // First-time device-pairing approval.
     Q_INVOKABLE void approvePairing();
     Q_INVOKABLE void rejectPairing();
 
@@ -71,12 +76,17 @@ signals:
     void sharedFilesChanged();
 
 private:
+    struct TransferFile {
+        QString filename;
+        qint64 size = 0;
+    };
+
     struct TransferRequest {
         QString id;
-        QString filename;
+        QVector<TransferFile> files;
         QString sender;
         QString sessionToken;
-        qint64 size = 0;
+        qint64 totalSize = 0;
         QString state;
         QDateTime expiresAt;
     };

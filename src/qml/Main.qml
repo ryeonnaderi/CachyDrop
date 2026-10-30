@@ -37,7 +37,7 @@ Kirigami.ApplicationWindow {
 
         Flickable {
             anchors.fill: parent
-            contentWidth: availableWidth
+            contentWidth: width
             contentHeight: mainColumn.implicitHeight
                            + Kirigami.Units.largeSpacing * 2
             clip: true
@@ -278,6 +278,13 @@ Kirigami.ApplicationWindow {
                             highlighted: true
                             onClicked: fileDialog.open()
                         }
+                        QQC2.Label {
+    id: shareStatus
+    width: parent.width
+    text: ""
+    wrapMode: Text.Wrap
+    horizontalAlignment: Text.AlignHCenter
+}
 
                         QQC2.Label {
                             width: parent.width
@@ -304,20 +311,30 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    FileDialog {
-        id: fileDialog
-        title: "Select files to send to your phone"
-        fileMode: FileDialog.OpenFiles
+   FileDialog {
+    id: fileDialog
 
-        onAccepted: {
-            const paths = selectedFiles.map(file => {
-                const url = file.toString()
-                return decodeURIComponent(url.replace(/^file:\/\/+/, "/"))
-            })
+    title: "Select files to send to your phone"
+    fileMode: FileDialog.OpenFiles
+    options: FileDialog.DontUseNativeDialog
 
-            receiverServer.shareFiles(paths)
+    onAccepted: {
+        const paths = selectedFiles
+            .map(file => String(file).replace(/^file:\/\/+/, "/"))
+            .filter(path => path.length > 0)
+
+        if (paths.length === 0) {
+            shareStatus.text = "No files selected."
+            return
         }
+
+        const count = receiverServer.shareFiles(paths)
+
+        shareStatus.text = count > 0
+            ? count + " file(s) ready to download on your phone."
+            : "No files could be shared. Check file permissions and make sure receiving is running."
     }
+}
 
     QQC2.Dialog {
         id: errorDialog
@@ -416,17 +433,21 @@ Kirigami.ApplicationWindow {
             }
 
             QQC2.Label {
-                width: parent.width
-                text: "File: " + receiverServer.pendingFilename
-                wrapMode: Text.Wrap
-                font.bold: true
-            }
+    width: parent.width
+    text: "Files (" + receiverServer.pendingFileCount + "):\n"
+          + receiverServer.pendingFilenames.join("\n")
+    wrapMode: Text.Wrap
+    font.bold: true
+}
 
-            QQC2.Label {
-                width: parent.width
-                text: "Size: " + receiverServer.pendingSize + " bytes"
-                wrapMode: Text.Wrap
-            }
+QQC2.Label {
+    width: parent.width
+    text: "Total size: "
+          + (receiverServer.pendingSize / (1024 * 1024)).toFixed(2)
+          + " MiB"
+    wrapMode: Text.Wrap
+}
+
 
             QQC2.Label {
                 width: parent.width
@@ -437,6 +458,8 @@ Kirigami.ApplicationWindow {
         }
 
         footer: QQC2.DialogButtonBox {
+            spacing: 8
+            alignment: Qt.AlignRight
             standardButtons: QQC2.DialogButtonBox.NoButton
 
             QQC2.Button {
