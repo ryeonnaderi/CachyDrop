@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <QObject>
@@ -14,6 +15,7 @@ class ReceiverServer : public QObject
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
     Q_PROPERTY(QString address READ address NOTIFY runningChanged)
     Q_PROPERTY(QString pairingCode READ pairingCode NOTIFY runningChanged)
+    Q_PROPERTY(QStringList qrRows READ qrRows NOTIFY runningChanged)
 
     Q_PROPERTY(bool hasPendingRequest READ hasPendingRequest
                NOTIFY pendingRequestChanged)
@@ -33,6 +35,7 @@ public:
     bool running() const;
     QString address() const;
     QString pairingCode() const;
+    QStringList qrRows() const;
 
     bool hasPendingRequest() const;
     QString pendingFilename() const;
@@ -74,6 +77,7 @@ private:
     QString m_address;
     QString m_pairingCode;
     QString m_activeRequestId;
+    QStringList m_qrRows;
 
     QHash<QString, TransferRequest> m_requests;
     QHash<QString, SharedFile> m_sharedFiles;

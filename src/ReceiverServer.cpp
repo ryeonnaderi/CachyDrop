@@ -1,3 +1,4 @@
+
 #include "ReceiverServer.h"
 
 #include <QDir>
@@ -15,6 +16,7 @@
 #include <QUuid>
 #include <QTcpSocket>
 #include <QTimer>
+#include <qrencode.h>
 
 namespace {
 
@@ -292,6 +294,11 @@ QString ReceiverServer::pairingCode() const
     return m_pairingCode;
 }
 
+QStringList ReceiverServer::qrRows() const
+{
+    return m_qrRows;
+}
+
 bool ReceiverServer::hasPendingRequest() const
 {
     return m_requests.contains(m_activeRequestId) &&
@@ -324,10 +331,13 @@ int ReceiverServer::shareFiles(const QStringList &paths)
         return 0;
 
     QHash<QString, SharedFile> selected;
+
     for (const QString &path : paths) {
         const QFileInfo info(path);
+
         if (!info.exists() || !info.isFile() || !info.isReadable())
             continue;
+
         if (info.size() < 0 || info.size() > MaxUploadSize)
             continue;
 
@@ -336,12 +346,14 @@ int ReceiverServer::shareFiles(const QStringList &paths)
         file.path = info.absoluteFilePath();
         file.filename = safeFilename(info.fileName());
         file.size = info.size();
+
         if (!file.filename.isEmpty())
             selected.insert(file.id, file);
     }
 
     m_sharedFiles = selected;
     emit sharedFilesChanged();
+
     return m_sharedFiles.size();
 }
 
@@ -349,6 +361,7 @@ bool ReceiverServer::start()
 {
     if (running())
         return true;
+
     if (!m_server.listen(QHostAddress::AnyIPv4, 8765))
         return false;
 
@@ -359,29 +372,69 @@ bool ReceiverServer::start()
     m_requests.clear();
     m_activeRequestId.clear();
     m_address.clear();
+    m_qrRows.clear();
 
     for (const QNetworkInterface &interface :
          QNetworkInterface::allInterfaces()) {
         const auto flags = interface.flags();
+
         if (!flags.testFlag(QNetworkInterface::IsUp) ||
             !flags.testFlag(QNetworkInterface::IsRunning) ||
-            flags.testFlag(QNetworkInterface::IsLoopBack))
+            flags.testFlag(QNetworkInterface::IsLoopBack)) {
             continue;
+        }
 
         for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
             const QHostAddress ip = entry.ip();
+
             if (ip.protocol() == QAbstractSocket::IPv4Protocol &&
                 ip != QHostAddress::LocalHost) {
-                m_address = QStringLiteral("http://%1:8765").arg(ip.toString());
+                m_address =
+                    QStringLiteral("http://%1:8765").arg(ip.toString());
                 break;
             }
         }
+
         if (!m_address.isEmpty())
             break;
     }
 
+    // Generate QR rows from the local connection URL.
+    if (!m_address.isEmpty()) {
+        const QByteArray url = m_address.toUtf8();
+
+        QRcode *qr = QRcode_encodeString(
+            url.constData(),
+            0,
+            QR_ECLEVEL_M,
+            QR_MODE_8,
+            1
+        );
+
+        if (qr != nullptr) {
+            for (int y = 0; y < qr->width; ++y) {
+                QString row;
+                row.reserve(qr->width);
+
+                for (int x = 0; x < qr->width; ++x) {
+                    const unsigned char module =
+                        qr->data[y * qr->width + x];
+
+                    row.append((module & 1)
+                        ? QLatin1Char('1')
+                        : QLatin1Char('0'));
+                }
+
+                m_qrRows.append(row);
+            }
+
+            QRcode_free(qr);
+        }
+    }
+
     emit runningChanged();
     emit pendingRequestChanged();
+
     return true;
 }
 
@@ -391,8 +444,10 @@ void ReceiverServer::stop()
         return;
 
     m_server.close();
+
     m_address.clear();
     m_pairingCode.clear();
+    m_qrRows.clear();
     m_requests.clear();
     m_activeRequestId.clear();
     m_sharedFiles.clear();
@@ -405,8 +460,10 @@ void ReceiverServer::stop()
 void ReceiverServer::approveRequest()
 {
     auto it = m_requests.find(m_activeRequestId);
+
     if (it == m_requests.end() || it->state != "pending")
         return;
+
     it->state = "approved";
     emit pendingRequestChanged();
 }
@@ -414,10 +471,14 @@ void ReceiverServer::approveRequest()
 void ReceiverServer::rejectRequest()
 {
     auto it = m_requests.find(m_activeRequestId);
+
     if (it == m_requests.end() || it->state != "pending")
         return;
+
     it->state = "rejected";
-    it->expiresAt = QDateTime::currentDateTimeUtc().addSecs(30);
+    it->expiresAt =
+        QDateTime::currentDateTimeUtc().addSecs(30);
+
     emit pendingRequestChanged();
 }
 
@@ -430,12 +491,14 @@ void ReceiverServer::expireRequests()
         if (it->expiresAt <= now) {
             if (it.key() == m_activeRequestId)
                 m_activeRequestId.clear();
+
             it = m_requests.erase(it);
             changed = true;
         } else {
             ++it;
         }
     }
+
     if (changed)
         emit pendingRequestChanged();
 }
@@ -452,30 +515,39 @@ void ReceiverServer::handleConnection()
 
             QByteArray buffer =
                 socket->property("requestBuffer").toByteArray();
+
             buffer += socket->readAll();
 
             const qsizetype headerEnd = buffer.indexOf("\r\n\r\n");
+
             if (headerEnd < 0) {
                 if (buffer.size() > 16 * 1024) {
                     socket->setProperty("requestProcessed", true);
-                    socket->write(response("431 Request Header Fields Too Large",
-                                            "text/plain", "Headers too large"));
+                    socket->write(response(
+                        "431 Request Header Fields Too Large",
+                        "text/plain",
+                        "Headers too large"));
                     socket->disconnectFromHost();
                 } else {
                     socket->setProperty("requestBuffer", buffer);
                 }
+
                 return;
             }
 
             const QByteArray headers = buffer.left(headerEnd);
             qint64 contentLength = 0;
+
             for (const QByteArray &line : headers.split('\n')) {
                 const QByteArray trimmed = line.trimmed();
+
                 if (trimmed.toLower().startsWith("content-length:")) {
                     bool ok = false;
+
                     contentLength =
                         trimmed.mid(trimmed.indexOf(':') + 1)
                             .trimmed().toLongLong(&ok);
+
                     if (!ok)
                         contentLength = -1;
                 }
@@ -484,8 +556,10 @@ void ReceiverServer::handleConnection()
             if (contentLength < 0 ||
                 contentLength > MaxUploadSize + 1024 * 1024) {
                 socket->setProperty("requestProcessed", true);
-                socket->write(response("413 Content Too Large",
-                                       "text/plain", "Upload too large"));
+                socket->write(response(
+                    "413 Content Too Large",
+                    "text/plain",
+                    "Upload too large"));
                 socket->disconnectFromHost();
                 return;
             }
@@ -496,27 +570,34 @@ void ReceiverServer::handleConnection()
             }
 
             socket->setProperty("requestProcessed", true);
-            const QByteArray body = buffer.mid(headerEnd + 4, contentLength);
+
+            const QByteArray body =
+                buffer.mid(headerEnd + 4, contentLength);
+
             const QList<QByteArray> lines = headers.split('\n');
+
             if (lines.isEmpty()) {
-                socket->write(response("400 Bad Request",
-                                       "text/plain", "Bad request"));
+                socket->write(response(
+                    "400 Bad Request", "text/plain", "Bad request"));
                 socket->disconnectFromHost();
                 return;
             }
 
             const QList<QByteArray> firstLine =
                 lines.first().trimmed().split(' ');
+
             if (firstLine.size() < 2) {
-                socket->write(response("400 Bad Request",
-                                       "text/plain", "Bad request"));
+                socket->write(response(
+                    "400 Bad Request", "text/plain", "Bad request"));
                 socket->disconnectFromHost();
                 return;
             }
 
             const QByteArray method = firstLine.at(0);
+
             const QUrl url(QStringLiteral("http://localhost") +
                            QString::fromUtf8(firstLine.at(1)));
+
             const QString path = url.path();
             const QUrlQuery query(url);
 
@@ -527,20 +608,27 @@ void ReceiverServer::handleConnection()
 
             if (method == "GET" &&
                 (path == "/" || path == "/index.html")) {
-                socket->write(response("200 OK",
-                    "text/html; charset=utf-8", htmlPage()));
+                socket->write(response(
+                    "200 OK",
+                    "text/html; charset=utf-8",
+                    htmlPage()));
 
             } else if (method == "GET" && path == "/health") {
                 sendJson("200 OK", {
-                    {"status", "ok"}, {"app", "CachyDrop"}
+                    {"status", "ok"},
+                    {"app", "CachyDrop"}
                 });
 
             } else if (method == "GET" && path == "/outgoing-page") {
-                socket->write(response("200 OK",
-                    "text/html; charset=utf-8", outgoingHtmlPage()));
+                socket->write(response(
+                    "200 OK",
+                    "text/html; charset=utf-8",
+                    outgoingHtmlPage()));
 
             } else if (method == "POST" && path == "/outgoing") {
-                const QJsonDocument document = QJsonDocument::fromJson(body);
+                const QJsonDocument document =
+                    QJsonDocument::fromJson(body);
+
                 if (!document.isObject()) {
                     sendJson("400 Bad Request", {
                         {"error", "Invalid request"}
@@ -553,49 +641,64 @@ void ReceiverServer::handleConnection()
                     });
                 } else {
                     QJsonArray files;
+
                     for (const SharedFile &file : m_sharedFiles) {
                         const QFileInfo info(file.path);
+
                         if (!info.exists() || !info.isFile() ||
                             info.size() != file.size)
                             continue;
+
                         files.append(QJsonObject{
                             {"id", file.id},
                             {"filename", file.filename},
                             {"size", file.size}
                         });
                     }
+
                     sendJson("200 OK", {{"files", files}});
                 }
 
             } else if (method == "GET" && path == "/download") {
                 const QString id = query.queryItemValue("id");
                 const auto it = m_sharedFiles.constFind(id);
+
                 if (it == m_sharedFiles.cend()) {
-                    socket->write(response("404 Not Found", "text/plain",
-                                           "File not found or no longer shared"));
+                    socket->write(response(
+                        "404 Not Found",
+                        "text/plain",
+                        "File not found or no longer shared"));
                 } else {
                     const QFileInfo info(it->path);
+
                     if (!info.exists() || !info.isFile() ||
                         info.size() != it->size ||
                         info.size() > MaxUploadSize) {
-                        socket->write(response("404 Not Found", "text/plain",
-                                               "File is no longer available"));
+                        socket->write(response(
+                            "404 Not Found",
+                            "text/plain",
+                            "File is no longer available"));
                     } else {
                         QFile file(it->path);
+
                         if (!file.open(QIODevice::ReadOnly)) {
-                            socket->write(response("500 Internal Server Error",
-                                                   "text/plain",
-                                                   "Could not open file"));
+                            socket->write(response(
+                                "500 Internal Server Error",
+                                "text/plain",
+                                "Could not open file"));
                         } else {
                             const QByteArray data = file.readAll();
                             file.close();
+
                             if (data.size() != it->size) {
                                 socket->write(response(
-                                    "500 Internal Server Error", "text/plain",
+                                    "500 Internal Server Error",
+                                    "text/plain",
                                     "Could not read the complete file"));
                             } else {
                                 const QByteArray encodedName =
                                     QUrl::toPercentEncoding(it->filename);
+
                                 QByteArray reply =
                                     "HTTP/1.1 200 OK\r\n"
                                     "Content-Type: application/octet-stream\r\n"
@@ -607,6 +710,7 @@ void ReceiverServer::handleConnection()
                                     "Connection: close\r\n"
                                     "X-Content-Type-Options: nosniff\r\n"
                                     "\r\n";
+
                                 reply += data;
                                 socket->write(reply);
                             }
@@ -615,7 +719,9 @@ void ReceiverServer::handleConnection()
                 }
 
             } else if (method == "POST" && path == "/request") {
-                const QJsonDocument document = QJsonDocument::fromJson(body);
+                const QJsonDocument document =
+                    QJsonDocument::fromJson(body);
+
                 if (!document.isObject()) {
                     sendJson("400 Bad Request", {
                         {"error", "Invalid request"}
@@ -623,9 +729,13 @@ void ReceiverServer::handleConnection()
                 } else {
                     const QJsonObject obj = document.object();
                     const QString code = obj.value("code").toString();
+
                     const QString filename =
                         safeFilename(obj.value("filename").toString());
-                    const double rawSize = obj.value("size").toDouble(-1);
+
+                    const double rawSize =
+                        obj.value("size").toDouble(-1);
+
                     const qint64 size = static_cast<qint64>(rawSize);
 
                     if (code != m_pairingCode || m_pairingCode.isEmpty()) {
@@ -647,12 +757,15 @@ void ReceiverServer::handleConnection()
                         });
                     } else {
                         const QString id =
-                            QUuid::createUuid().toString(QUuid::WithoutBraces);
+                            QUuid::createUuid().toString(
+                                QUuid::WithoutBraces);
+
                         TransferRequest request;
                         request.id = id;
                         request.filename = filename;
                         request.size = size;
-                        request.sender = socket->peerAddress().toString();
+                        request.sender =
+                            socket->peerAddress().toString();
                         request.state = "pending";
                         request.expiresAt =
                             QDateTime::currentDateTimeUtc()
@@ -660,7 +773,9 @@ void ReceiverServer::handleConnection()
 
                         m_requests.insert(id, request);
                         m_activeRequestId = id;
+
                         emit pendingRequestChanged();
+
                         sendJson("200 OK", {{"id", id}});
                     }
                 }
@@ -668,9 +783,11 @@ void ReceiverServer::handleConnection()
             } else if (method == "GET" && path == "/status") {
                 const QString id = query.queryItemValue("id");
                 const auto it = m_requests.constFind(id);
+
                 if (it == m_requests.cend()) {
                     sendJson("404 Not Found", {
-                        {"state", "expired"}, {"message", "Request expired"}
+                        {"state", "expired"},
+                        {"message", "Request expired"}
                     });
                 } else {
                     sendJson("200 OK", {
@@ -683,6 +800,7 @@ void ReceiverServer::handleConnection()
             } else if (method == "POST" && path == "/upload") {
                 const QString id = query.queryItemValue("id");
                 auto it = m_requests.find(id);
+
                 if (it == m_requests.end() || it->state != "approved" ||
                     it->expiresAt <= QDateTime::currentDateTimeUtc()) {
                     sendJson("403 Forbidden", {
@@ -690,9 +808,11 @@ void ReceiverServer::handleConnection()
                     });
                 } else {
                     QByteArray contentType;
+
                     for (const QByteArray &line : lines) {
                         const QByteArray trimmed = line.trimmed();
                         const qsizetype colon = trimmed.indexOf(':');
+
                         if (colon >= 0 &&
                             trimmed.left(colon).trimmed().toLower()
                                 == "content-type") {
@@ -703,6 +823,7 @@ void ReceiverServer::handleConnection()
 
                     const QRegularExpression boundaryRegex(
                         R"regex(boundary=(?:"([^"]+)"|([^;\s]+)))regex");
+
                     const auto match = boundaryRegex.match(
                         QString::fromLatin1(contentType));
 
@@ -716,16 +837,23 @@ void ReceiverServer::handleConnection()
                             (match.captured(1).isEmpty()
                                 ? match.captured(2)
                                 : match.captured(1)).toLatin1();
+
                         const QByteArray marker = "\r\n--" + boundary;
+
                         const qsizetype partHeadersEnd =
                             body.indexOf("\r\n\r\n");
-                        const qsizetype dataEnd = body.lastIndexOf(marker);
+
+                        const qsizetype dataEnd =
+                            body.lastIndexOf(marker);
+
                         const QByteArray partHeaders =
                             partHeadersEnd >= 0
-                                ? body.left(partHeadersEnd) : QByteArray();
+                                ? body.left(partHeadersEnd)
+                                : QByteArray();
 
                         const QRegularExpression filenameRegex(
                             R"regex(filename="([^"]*)")regex");
+
                         const auto filenameMatch = filenameRegex.match(
                             QString::fromLatin1(partHeaders));
 
@@ -740,6 +868,7 @@ void ReceiverServer::handleConnection()
                             const QString filename = safeFilename(
                                 QUrl::fromPercentEncoding(
                                     filenameMatch.captured(1).toUtf8()));
+
                             const QByteArray fileData = body.mid(
                                 partHeadersEnd + 4,
                                 dataEnd - partHeadersEnd - 4);
@@ -752,45 +881,61 @@ void ReceiverServer::handleConnection()
                                      "File details did not match approval"}
                                 });
                             } else {
-                                const QString folder = QDir::homePath() +
+                                const QString folder =
+                                    QDir::homePath() +
                                     QStringLiteral("/Downloads/CachyDrop");
+
                                 if (!QDir().mkpath(folder)) {
                                     sendJson("500 Internal Server Error", {
                                         {"error",
                                          "Cannot create destination folder"}
                                     });
                                 } else {
-                                    QString destination = folder + "/" + filename;
+                                    QString destination =
+                                        folder + "/" + filename;
+
                                     if (QFileInfo::exists(destination)) {
                                         const QFileInfo info(filename);
+
                                         const QString base =
                                             info.completeBaseName();
+
                                         const QString suffix =
                                             info.completeSuffix().isEmpty()
                                                 ? QString()
                                                 : "." + info.completeSuffix();
+
                                         int index = 1;
+
                                         do {
-                                            destination = folder + "/" + base +
-                                                QStringLiteral(" (%1)").arg(index++) +
+                                            destination =
+                                                folder + "/" + base +
+                                                QStringLiteral(" (%1)")
+                                                    .arg(index++) +
                                                 suffix;
-                                        } while (QFileInfo::exists(destination));
+                                        } while (
+                                            QFileInfo::exists(destination));
                                     }
 
                                     QFile output(destination);
+
                                     if (!output.open(QIODevice::WriteOnly) ||
-                                        output.write(fileData) != fileData.size()) {
+                                        output.write(fileData) !=
+                                            fileData.size()) {
                                         output.close();
                                         QFile::remove(destination);
+
                                         sendJson("500 Internal Server Error", {
                                             {"error", "Could not save file"}
                                         });
                                     } else {
                                         output.close();
+
                                         it->state = "uploaded";
                                         it->expiresAt =
                                             QDateTime::currentDateTimeUtc()
                                                 .addSecs(30);
+
                                         socket->write(response(
                                             "200 OK",
                                             "text/html; charset=utf-8",
@@ -806,8 +951,8 @@ void ReceiverServer::handleConnection()
                 }
 
             } else {
-                socket->write(response("404 Not Found",
-                                       "text/plain", "Not found"));
+                socket->write(response(
+                    "404 Not Found", "text/plain", "Not found"));
             }
 
             socket->disconnectFromHost();

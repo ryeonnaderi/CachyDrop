@@ -1,3 +1,4 @@
+
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Dialogs
@@ -8,9 +9,9 @@ Kirigami.ApplicationWindow {
 
     title: "CachyDrop"
     width: 760
-    height: 600
+    height: 700
     minimumWidth: 600
-    minimumHeight: 420
+    minimumHeight: 560
     visible: true
 
     Connections {
@@ -29,28 +30,35 @@ Kirigami.ApplicationWindow {
 
         Flickable {
             anchors.fill: parent
-            contentWidth: parent.width
-            contentHeight: mainColumn.implicitHeight + Kirigami.Units.largeSpacing * 2
+            contentWidth: availableWidth
+            contentHeight: mainColumn.implicitHeight
+                           + Kirigami.Units.largeSpacing * 2
             clip: true
 
             Column {
                 id: mainColumn
-                anchors.horizontalCenter: parent.horizontalCenter
+
+                width: Math.min(parent.width - 40, 480)
+                x: Math.round((parent.width - width) / 2)
                 y: Kirigami.Units.largeSpacing
                 spacing: Kirigami.Units.largeSpacing
-                width: Math.min(parent.width - 48, 440)
 
                 Kirigami.Heading {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width
                     text: "CachyDrop"
                     level: 1
+                    horizontalAlignment: Text.AlignHCenter
                 }
 
                 QQC2.Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: parent.width
                     text: receiverServer.running
-                          ? "Receiving service is running"
+                          ? "●  Receiving service is running"
                           : "Ready to receive files"
+                    horizontalAlignment: Text.AlignHCenter
+                    color: receiverServer.running
+                           ? Kirigami.Theme.positiveTextColor
+                           : Kirigami.Theme.textColor
                 }
 
                 QQC2.Button {
@@ -72,63 +80,220 @@ Kirigami.ApplicationWindow {
                     }
                 }
 
-                QQC2.Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: receiverServer.address
-                    visible: receiverServer.running
-                    font.bold: true
-                }
+                Rectangle {
+                    id: connectionCard
 
-                QQC2.Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: receiverServer.running
-                          ? "Pairing code"
-                          : ""
-                    visible: receiverServer.running
-                }
-
-                Kirigami.Heading {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: receiverServer.pairingCode
-                    visible: receiverServer.running
-                    level: 2
-                }
-
-                QQC2.Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: receiverServer.running
-                          ? "Enter this code on your phone"
-                          : "Local network • Port 8765"
-                    opacity: 0.7
-                    wrapMode: Text.Wrap
-                }
-
-                QQC2.Button {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "Select files to send to phone"
-                    icon.name: "document-send"
-                    enabled: receiverServer.running
-                    onClicked: fileDialog.open()
-                }
-
-                QQC2.Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: receiverServer.sharedFileCount === 0
-                          ? "No outgoing files selected"
-                          : receiverServer.sharedFileCount
-                            + " file(s) available to download"
-                    visible: receiverServer.running
-                    opacity: 0.7
-                    wrapMode: Text.Wrap
-                }
-
-                QQC2.Label {
                     width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
+                    height: connectionColumn.implicitHeight
+                            + Kirigami.Units.largeSpacing * 2
+                    radius: 16
+                    color: Kirigami.Theme.backgroundColor
+                    border.width: 1
+                    border.color: Kirigami.Theme.alternateBackgroundColor
                     visible: receiverServer.running
-                    text: "On your phone, open the address above and choose “Download files from this computer”."
-                    opacity: 0.7
+
+                    Column {
+                        id: connectionColumn
+
+                        width: parent.width - 32
+                        x: 16
+                        y: 16
+                        spacing: Kirigami.Units.mediumSpacing
+
+                        Kirigami.Heading {
+                            width: parent.width
+                            text: "Connect your phone"
+                            level: 2
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: "Scan this QR code with your phone camera."
+                            wrapMode: Text.Wrap
+                            horizontalAlignment: Text.AlignHCenter
+                            opacity: 0.8
+                        }
+
+                        Rectangle {
+                            id: qrCard
+
+                            width: 248
+                            height: 248
+                            radius: 12
+                            color: "#ffffff"
+                            border.width: 1
+                            border.color: "#d8dce3"
+                            visible: receiverServer.qrRows.length > 0
+
+                            anchors.horizontalCenter: parent.horizontalCenter
+
+                            Canvas {
+                                id: qrCanvas
+
+                                width: 224
+                                height: 224
+                                anchors.centerIn: parent
+
+                                property var qrRows: receiverServer.qrRows
+
+                                onQrRowsChanged: requestPaint()
+
+                                onPaint: {
+                                    const ctx = getContext("2d")
+                                    const rows = qrRows
+                                    const count = rows.length
+
+                                    ctx.clearRect(0, 0, width, height)
+                                    ctx.fillStyle = "#ffffff"
+                                    ctx.fillRect(0, 0, width, height)
+
+                                    if (count === 0)
+                                        return
+
+                                    const quietZone = 4
+                                    const modules = count + quietZone * 2
+                                    const scale = Math.floor(
+                                        Math.min(width, height) / modules
+                                    )
+                                    const size = scale * modules
+                                    const offsetX = Math.floor((width - size) / 2)
+                                    const offsetY = Math.floor((height - size) / 2)
+
+                                    ctx.fillStyle = "#000000"
+
+                                    for (let y = 0; y < count; ++y) {
+                                        for (let x = 0; x < rows[y].length; ++x) {
+                                            if (rows[y].charAt(x) === "1") {
+                                                ctx.fillRect(
+                                                    offsetX + (x + quietZone) * scale,
+                                                    offsetY + (y + quietZone) * scale,
+                                                    scale,
+                                                    scale
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Component.onCompleted: requestPaint()
+                            }
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            visible: !qrCard.visible
+                            text: "QR code unavailable"
+                            horizontalAlignment: Text.AlignHCenter
+                            opacity: 0.7
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: "Or open this address manually:"
+                            horizontalAlignment: Text.AlignHCenter
+                            opacity: 0.8
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: receiverServer.address
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WrapAnywhere
+                            font.family: "monospace"
+                            color: Kirigami.Theme.linkColor
+                        }
+
+                        Kirigami.Separator {
+                            width: parent.width
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: "Your pairing code"
+                            horizontalAlignment: Text.AlignHCenter
+                            opacity: 0.8
+                        }
+
+                        Kirigami.Heading {
+                            width: parent.width
+                            text: receiverServer.pairingCode
+                            level: 1
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: "Enter this code on your phone to pair."
+                            wrapMode: Text.Wrap
+                            horizontalAlignment: Text.AlignHCenter
+                            opacity: 0.8
+                        }
+                    }
+                }
+
+                Rectangle {
+                    id: transferCard
+
+                    width: parent.width
+                    height: transferColumn.implicitHeight
+                            + Kirigami.Units.largeSpacing * 2
+                    radius: 16
+                    color: Kirigami.Theme.backgroundColor
+                    border.width: 1
+                    border.color: Kirigami.Theme.alternateBackgroundColor
+
+                    Column {
+                        id: transferColumn
+
+                        width: parent.width - 32
+                        x: 16
+                        y: 16
+                        spacing: Kirigami.Units.mediumSpacing
+
+                        Kirigami.Heading {
+                            width: parent.width
+                            text: "Transfer files"
+                            level: 2
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: "Send files from this computer to your phone."
+                            wrapMode: Text.Wrap
+                            opacity: 0.8
+                        }
+
+                        QQC2.Button {
+                            width: parent.width
+                            text: "Select files to send to phone"
+                            icon.name: "document-send"
+                            enabled: receiverServer.running
+                            highlighted: true
+
+                            onClicked: fileDialog.open()
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: receiverServer.sharedFileCount === 0
+                                  ? "No outgoing files selected"
+                                  : receiverServer.sharedFileCount
+                                    + " file(s) available to download"
+                            visible: receiverServer.running
+                            wrapMode: Text.Wrap
+                            horizontalAlignment: Text.AlignHCenter
+                            opacity: 0.8
+                        }
+
+                        QQC2.Label {
+                            width: parent.width
+                            text: "Incoming transfers require your approval."
+                            wrapMode: Text.Wrap
+                            horizontalAlignment: Text.AlignHCenter
+                            opacity: 0.8
+                        }
+                    }
                 }
             }
         }
@@ -140,13 +305,13 @@ Kirigami.ApplicationWindow {
         fileMode: FileDialog.OpenFiles
 
         onAccepted: {
-    const paths = selectedFiles.map(file => {
-        const url = file.toString()
-        return decodeURIComponent(url.replace(/^file:\/\/+/, "/"))
-    })
+            const paths = selectedFiles.map(file => {
+                const url = file.toString()
+                return decodeURIComponent(url.replace(/^file:\/\/+/, "/"))
+            })
 
-    receiverServer.shareFiles(paths)
-}
+            receiverServer.shareFiles(paths)
+        }
     }
 
     QQC2.Dialog {
@@ -157,10 +322,20 @@ Kirigami.ApplicationWindow {
         title: "No files could be shared"
         standardButtons: QQC2.Dialog.Ok
         modal: true
+    }
+
+    QQC2.Dialog {
+        id: errorDialog
+        parent: root.overlay
+        anchors.centerIn: parent
+        width: Math.min(root.width - 48, 380)
+        title: "Could not start receiving"
+        modal: true
+        standardButtons: QQC2.Dialog.Ok
 
         contentItem: QQC2.Label {
-            text: "Make sure the selected files exist, are readable, and are no larger than 100 MiB each."
-            wrapMode: Text.WordWrap
+            text: "CachyDrop could not start the receiving service. Check the terminal for errors or verify that port 8765 is available."
+            wrapMode: Text.Wrap
         }
     }
 
@@ -169,7 +344,7 @@ Kirigami.ApplicationWindow {
         parent: root.overlay
         anchors.centerIn: parent
         width: Math.min(root.width - 48, 420)
-        title: "Approve incoming transfer"
+        title: "Incoming transfer"
         modal: true
         closePolicy: QQC2.Popup.NoAutoClose
 
@@ -179,62 +354,36 @@ Kirigami.ApplicationWindow {
 
             QQC2.Label {
                 width: parent.width
+                text: "A device wants to send files to this computer."
                 wrapMode: Text.Wrap
-                text: "A device wants to send a file to this computer."
-            }
-
-            QQC2.Label {
-                width: parent.width
-                wrapMode: Text.Wrap
-                font.bold: true
-                text: receiverServer.pendingFilename
-            }
-
-            QQC2.Label {
-                width: parent.width
-                text: "Size: "
-                      + (receiverServer.pendingSize / (1024 * 1024)).toFixed(2)
-                      + " MiB"
-            }
-
-            QQC2.Label {
-                width: parent.width
-                text: "Sender: " + receiverServer.pendingSender
-                wrapMode: Text.Wrap
-                opacity: 0.7
-            }
-
-            Row {
-                spacing: Kirigami.Units.mediumSpacing
-                width: parent.width
-
-                QQC2.Button {
-                    text: "Reject"
-                    onClicked: receiverServer.rejectRequest()
-                }
-
-                QQC2.Button {
-                    text: "Accept transfer"
-                    highlighted: true
-                    onClicked: receiverServer.approveRequest()
-                }
             }
         }
-    }
 
-    QQC2.Dialog {
-        id: errorDialog
-        parent: root.overlay
-        anchors.centerIn: parent
-        width: Math.min(root.width - 48, 380)
-        title: "Could not start receiving"
-        standardButtons: QQC2.Dialog.Ok
-        modal: true
+        footer: QQC2.DialogButtonBox {
+            standardButtons: QQC2.DialogButtonBox.NoButton
 
-        contentItem: QQC2.Label {
-            text: "Port 8765 may already be in use. Close the other service and try again."
-            wrapMode: Text.WordWrap
-            width: parent ? parent.width : 320
+            QQC2.Button {
+                text: "Reject"
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
+
+                onClicked: {
+                    if (receiverServer.rejectRequest)
+                        receiverServer.rejectRequest()
+                    approvalDialog.close()
+                }
+            }
+
+            QQC2.Button {
+                text: "Approve"
+                highlighted: true
+                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+
+                onClicked: {
+                    if (receiverServer.approveRequest)
+                        receiverServer.approveRequest()
+                    approvalDialog.close()
+                }
+            }
         }
     }
 }
