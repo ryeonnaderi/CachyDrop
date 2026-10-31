@@ -1,26 +1,18 @@
 
 #include "ReceiverServer.h"
-#include "WebPages.h"
 #include "TransferUtils.h"
 #include "HttpUtils.h"
 #include "PairingManager.h"
 #include "Network.h"
 #include "QrCodeUtils.h"
-#include "HttpRequestParser.h"
 #include "RequestRouter.h"
 
 
-#include <QDir>
-#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHostAddress>
 #include <QRandomGenerator>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QUrl>
-#include <QUrlQuery>
+
 #include <QUuid>
 #include <QTcpSocket>
 #include <QTcpServer>
@@ -33,9 +25,6 @@
 namespace {
 
 constexpr qint64 MaxUploadSize = 100LL * 1024 * 1024;
-constexpr qint64 MaxBatchSize = 100LL * 1024 * 1024;
-constexpr int MaxBatchFiles = 20;
-constexpr int RequestLifetimeSeconds = 120;
 
 }
 

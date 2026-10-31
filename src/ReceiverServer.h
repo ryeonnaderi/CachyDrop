@@ -10,7 +10,7 @@
 #include <QVector>
 #include <QVariant>
 #include "PairingManager.h"
-#include "HttpRequestParser.h"
+
 
 class RequestRouter;
 
