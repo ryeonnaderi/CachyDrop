@@ -72,9 +72,13 @@ bool parseMultipart(
     const QByteArray delimiter =
         "--" + boundaryString.toLatin1();
 
-    if (boundaryString.isEmpty()) {
-        return fail(QStringLiteral("Empty multipart boundary."));
-    }
+    if (boundaryString.isEmpty() || boundaryString.size() > 70 ||
+    !QRegularExpression(
+         QStringLiteral("^[0-9A-Za-z'()+_,./:=?-]+$"))
+         .match(boundaryString)
+         .hasMatch()) {
+    return fail(QStringLiteral("Invalid multipart boundary."));
+}
 
     const QByteArray partSeparator = "\r\n" + delimiter;
 
@@ -114,8 +118,26 @@ bool parseMultipart(
         position = headersEnd + 4;
 
         // Find the next boundary using byte positions, not text splitting.
-        const qsizetype nextBoundary =
-            body.indexOf(partSeparator, position);
+        
+        // Find the next valid boundary, skipping boundary-like bytes
+        // that occur inside binary file data.
+        qsizetype nextBoundary = -1;
+        qsizetype searchPosition = position;
+
+        while ((searchPosition =
+                    body.indexOf(partSeparator, searchPosition)) >= 0) {
+            const qsizetype afterBoundary =
+                searchPosition + partSeparator.size();
+
+            if (body.mid(afterBoundary, 2) == "\r\n" ||
+                body.mid(afterBoundary, 2) == "--") {
+                nextBoundary = searchPosition;
+                break;
+            }
+
+            searchPosition += partSeparator.size();
+        }
+
 
         if (nextBoundary < 0) {
             return fail(QStringLiteral("Multipart part has no closing boundary."));
@@ -172,11 +194,15 @@ const QRegularExpression filenameRegex(
             return fail(QStringLiteral("Invalid uploaded filename."));
         }
 
-        IncomingFile file;
-        file.filename = filename;
-        file.data = partData;
+        if (incoming.size() >= 20) {
+    return fail(QStringLiteral("Too many uploaded files."));
+}
 
-        incoming.append(file);
+IncomingFile file;
+file.filename = filename;
+file.data = partData;
+
+incoming.append(file);
     }
 
     if (incoming.isEmpty()) {

@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QDateTime>
 #include <QHash>
 #include <QString>
@@ -17,12 +18,10 @@ public:
 
     PairingManager();
 
-    // Start/stop the pairing session without deleting trusted devices.
     QString startNewSession();
     void stopSession();
 
     QString pairingToken() const;
-
     bool hasPendingPairing() const;
     QString pendingDevice() const;
     QString activePairingId() const;
@@ -31,22 +30,29 @@ public:
         const QString &presentedToken,
         const QString &device,
         int lifetimeSeconds,
-        QString *requestId = nullptr);
+        QString *requestId = nullptr,
+        const QByteArray &signingPublicKey = QByteArray(),
+        const QByteArray &encryptionPublicKey = QByteArray());
 
     bool approvePairing();
     bool rejectPairing();
 
-    // Returns false when the request has expired or does not exist.
     bool pairingStatus(
         const QString &id,
         QString *state,
         QString *sessionToken = nullptr) const;
 
-    // Returns true if at least one request changed due to expiry.
     bool expireRequests(const QDateTime &now);
 
     bool isAuthorized(const QString &token) const;
     QString sessionDevice(const QString &token) const;
+
+    // Returns the stored Ed25519 signing public key.
+    QByteArray trustedDeviceSigningKey(const QString &token) const;
+
+    // Returns the stored Curve25519 encryption public key.
+    // Empty means the device must pair again before encrypted transfers.
+    QByteArray trustedDeviceEncryptionKey(const QString &token) const;
 
     QVariantList trustedDeviceList() const;
     bool removeTrustedDevice(const QString &token);
@@ -58,6 +64,8 @@ private:
         QString sessionToken;
         QString state;
         QDateTime expiresAt;
+        QByteArray signingPublicKey;
+        QByteArray encryptionPublicKey;
     };
 
     QString m_pairingToken;
@@ -66,8 +74,16 @@ private:
     QHash<QString, PairingRequest> m_pairings;
     QHash<QString, QString> m_sessions;
     QHash<QString, QString> m_trustedDevices;
+    QHash<QString, QByteArray> m_trustedSigningKeys;
+    QHash<QString, QByteArray> m_trustedEncryptionKeys;
 
     static QString newToken();
+
     void loadTrustedDevices();
-    void saveTrustedDevice(const QString &token, const QString &device);
+
+    bool saveTrustedDevice(
+        const QString &token,
+        const QString &device,
+        const QByteArray &signingPublicKey,
+        const QByteArray &encryptionPublicKey);
 };

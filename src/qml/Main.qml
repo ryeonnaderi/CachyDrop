@@ -5,42 +5,41 @@ import org.kde.kirigami as Kirigami
 import QtCore
 import QtQuick.Layouts
 
-
 Kirigami.ApplicationWindow {
     id: root
     property int selectedPage: 0
 
     globalDrawer: Kirigami.GlobalDrawer {
-    id: navigationDrawer
-    title: "CachyDrop"
-    titleIcon: "network-connect"
-    modal: false
+        id: navigationDrawer
+        title: "CachyDrop"
+        titleIcon: "network-connect"
+        modal: false
 
-    actions: [
-        Kirigami.Action {
-            text: "CachyDrop"
-            icon.name: "document-send"
-            checked: root.selectedPage === 0
-            onTriggered: root.selectedPage = 0
-        },
-        Kirigami.Action {
-            text: "Paired Devices"
-            icon.name: "network-connect"
-            checked: root.selectedPage === 1
-            onTriggered: root.selectedPage = 1
-        },
-        Kirigami.Action {
-            text: "Appearance"
-            icon.name: "preferences-desktop-theme"
-            checked: root.selectedPage === 2
-            onTriggered: root.selectedPage = 2
-        }
-    ]
-}
+        actions: [
+            Kirigami.Action {
+                text: "CachyDrop"
+                icon.name: "document-send"
+                checked: root.selectedPage === 0
+                onTriggered: root.selectedPage = 0
+            },
+            Kirigami.Action {
+                text: "Paired Devices"
+                icon.name: "network-connect"
+                checked: root.selectedPage === 1
+                onTriggered: root.selectedPage = 1
+            },
+            Kirigami.Action {
+                text: "Appearance"
+                icon.name: "preferences-desktop-theme"
+                checked: root.selectedPage === 2
+                onTriggered: root.selectedPage = 2
+            }
+        ]
+    }
 
     color: "transparent"
 
-        Settings {
+    Settings {
         id: appSettings
         category: "Appearance"
 
@@ -77,435 +76,424 @@ Kirigami.ApplicationWindow {
     }
 
     pageStack.initialPage: Kirigami.Page {
-    objectName: "homePage"
-    title: "CachyDrop"
-    StackLayout {
-    id: contentLayout
-    anchors.fill: parent
-    currentIndex: root.selectedPage
-      
+        objectName: "homePage"
+        title: "CachyDrop"
 
-        Flickable {
-    contentWidth: width
-    contentHeight: mainColumn.implicitHeight
-                   + Kirigami.Units.largeSpacing * 2
-    clip: true
+        StackLayout {
+            id: contentLayout
+            anchors.fill: parent
+            currentIndex: root.selectedPage
 
-            Column {
-                id: mainColumn
+            Flickable {
+                contentWidth: width
+                contentHeight: mainColumn.implicitHeight
+                               + Kirigami.Units.largeSpacing * 2
+                clip: true
 
-                width: Math.min(parent.width - 64, 680)
-                x: Math.round((parent.width - width) / 2)
-                y: Kirigami.Units.largeSpacing
-                spacing: Kirigami.Units.gridUnit
+                Column {
+                    id: mainColumn
+                    width: Math.min(parent.width - 64, 680)
+                    x: Math.round((parent.width - width) / 2)
+                    y: Kirigami.Units.largeSpacing
+                    spacing: Kirigami.Units.gridUnit
 
-                Kirigami.Heading {
-                    width: parent.width
-                    text: "CachyDrop"
-                    level: 1
-                    horizontalAlignment: Text.AlignHCenter
-                }
+                    Kirigami.Heading {
+                        width: parent.width
+                        text: "CachyDrop"
+                        level: 1
+                        horizontalAlignment: Text.AlignHCenter
+                    }
 
-                QQC2.Label {
-                    width: parent.width
-                    text: "Send files between your phone and computer"
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    opacity: 0.8
-                }
+                    QQC2.Label {
+                        width: parent.width
+                        text: "Send files between your phone and computer"
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        opacity: 0.8
+                    }
 
-                Rectangle {
-                    width: parent.width
-                    height: 52
-                    radius: 12
+                    Rectangle {
+                        width: parent.width
+                        height: 52
+                        radius: 12
+                        color: receiverServer.running
+                               ? "#183b2c"
+                               : Kirigami.Theme.alternateBackgroundColor
+                        border.width: 1
+                        border.color: receiverServer.running
+                                      ? "#287a50"
+                                      : Kirigami.Theme.disabledTextColor
 
-                    color: receiverServer.running
-                           ? "#183b2c"
-                           : Kirigami.Theme.alternateBackgroundColor
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 10
 
-                    border.width: 1
-                    border.color: receiverServer.running
-                                  ? "#287a50"
-                                  : Kirigami.Theme.disabledTextColor
+                            Rectangle {
+                                width: 10
+                                height: 10
+                                radius: 5
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: receiverServer.running
+                                       ? "#4ade80"
+                                       : Kirigami.Theme.disabledTextColor
+                            }
 
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 10
-
-                        Rectangle {
-                            width: 10
-                            height: 10
-                            radius: 5
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            color: receiverServer.running
-                                   ? "#4ade80"
-                                   : Kirigami.Theme.disabledTextColor
-                        }
-
-                        QQC2.Label {
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            text: receiverServer.running
-                                  ? "Receiving service is active"
-                                  : "Receiving service is stopped"
-
-                            color: receiverServer.running
-                                   ? "#bbf7d0"
-                                   : Kirigami.Theme.textColor
-
-                            font.weight: Font.DemiBold
+                            QQC2.Label {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: receiverServer.running
+                                      ? "Receiving service is active"
+                                      : "Receiving service is stopped"
+                                color: receiverServer.running
+                                       ? "#bbf7d0"
+                                       : Kirigami.Theme.textColor
+                                font.weight: Font.DemiBold
+                            }
                         }
                     }
-                }
 
-                QQC2.Button {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: receiverServer.running
-                          ? "Stop receiving"
-                          : "Start receiving"
-                    icon.name: receiverServer.running
-                               ? "media-playback-stop"
-                               : "download"
-                    highlighted: true
+                    QQC2.Button {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: receiverServer.running
+                              ? "Stop receiving"
+                              : "Start receiving"
+                        icon.name: receiverServer.running
+                                   ? "media-playback-stop"
+                                   : "download"
+                        highlighted: true
 
-                    onClicked: {
-                        if (receiverServer.running) {
-                            receiverServer.stop()
-                        } else if (!receiverServer.start()) {
-                            errorDialog.open()
+                        onClicked: {
+                            if (receiverServer.running) {
+                                receiverServer.stop()
+                            } else if (!receiverServer.start()) {
+                                errorDialog.open()
+                            }
                         }
                     }
-                }
 
-                Rectangle {
-                    id: connectionCard
+                    Rectangle {
+                        id: connectionCard
+                        width: parent.width
+                        height: connectionColumn.implicitHeight + 32
+                        radius: 16
+                        color: Kirigami.Theme.backgroundColor
+                        border.width: 1
+                        border.color: Kirigami.Theme.alternateBackgroundColor
+                        visible: receiverServer.running
 
-                    width: parent.width
-                    height: connectionColumn.implicitHeight + 32
-                    radius: 16
-                    color: Kirigami.Theme.backgroundColor
-                    border.width: 1
-                    border.color: Kirigami.Theme.alternateBackgroundColor
-                    visible: receiverServer.running
+                        Column {
+                            id: connectionColumn
+                            width: parent.width - 32
+                            x: 16
+                            y: 16
+                            spacing: Kirigami.Units.mediumSpacing
 
-                    Column {
-                        id: connectionColumn
+                            Kirigami.Heading {
+                                width: parent.width
+                                text: "Connect your phone"
+                                level: 2
+                                horizontalAlignment: Text.AlignHCenter
+                            }
 
-                        width: parent.width - 32
-                        x: 16
-                        y: 16
-                        spacing: Kirigami.Units.mediumSpacing
+                            QQC2.Label {
+                                width: parent.width
+                                text: "Scan this QR code with your phone camera."
+                                wrapMode: Text.Wrap
+                                horizontalAlignment: Text.AlignHCenter
+                                opacity: 0.8
+                            }
 
-                        Kirigami.Heading {
-                            width: parent.width
-                            text: "Connect your phone"
-                            level: 2
-                            horizontalAlignment: Text.AlignHCenter
-                        }
+                            Rectangle {
+                                id: qrCard
+                                width: 248
+                                height: 248
+                                radius: 12
+                                color: "#ffffff"
+                                border.width: 1
+                                border.color: "#d8dce3"
+                                visible: receiverServer.qrRows.length > 0
+                                anchors.horizontalCenter: parent.horizontalCenter
 
-                        QQC2.Label {
-                            width: parent.width
-                            text: "Scan this QR code with your phone camera."
-                            wrapMode: Text.Wrap
-                            horizontalAlignment: Text.AlignHCenter
-                            opacity: 0.8
-                        }
+                                Canvas {
+                                    id: qrCanvas
+                                    width: 224
+                                    height: 224
+                                    anchors.centerIn: parent
+                                    property var qrRows: receiverServer.qrRows
 
-                        Rectangle {
-                            id: qrCard
+                                    onQrRowsChanged: requestPaint()
 
-                            width: 248
-                            height: 248
-                            radius: 12
-                            color: "#ffffff"
-                            border.width: 1
-                            border.color: "#d8dce3"
-                            visible: receiverServer.qrRows.length > 0
-                            anchors.horizontalCenter: parent.horizontalCenter
+                                    onPaint: {
+                                        const ctx = getContext("2d")
+                                        const rows = qrRows
+                                        const count = rows.length
 
-                            Canvas {
-                                id: qrCanvas
+                                        ctx.clearRect(0, 0, width, height)
+                                        ctx.fillStyle = "#ffffff"
+                                        ctx.fillRect(0, 0, width, height)
 
-                                width: 224
-                                height: 224
-                                anchors.centerIn: parent
+                                        if (count === 0)
+                                            return
 
-                                property var qrRows: receiverServer.qrRows
+                                        const quietZone = 4
+                                        const modules = count + quietZone * 2
+                                        const scale = Math.floor(
+                                            Math.min(width, height) / modules
+                                        )
+                                        const size = scale * modules
+                                        const offsetX = Math.floor((width - size) / 2)
+                                        const offsetY = Math.floor((height - size) / 2)
 
-                                onQrRowsChanged: requestPaint()
+                                        ctx.fillStyle = "#000000"
 
-                                onPaint: {
-                                    const ctx = getContext("2d")
-                                    const rows = qrRows
-                                    const count = rows.length
-
-                                    ctx.clearRect(0, 0, width, height)
-                                    ctx.fillStyle = "#ffffff"
-                                    ctx.fillRect(0, 0, width, height)
-
-                                    if (count === 0)
-                                        return
-
-                                    const quietZone = 4
-                                    const modules = count + quietZone * 2
-                                    const scale = Math.floor(
-                                        Math.min(width, height) / modules
-                                    )
-                                    const size = scale * modules
-                                    const offsetX = Math.floor((width - size) / 2)
-                                    const offsetY = Math.floor((height - size) / 2)
-
-                                    ctx.fillStyle = "#000000"
-
-                                    for (let y = 0; y < count; ++y) {
-                                        for (let x = 0; x < rows[y].length; ++x) {
-                                            if (rows[y].charAt(x) === "1") {
-                                                ctx.fillRect(
-                                                    offsetX + (x + quietZone) * scale,
-                                                    offsetY + (y + quietZone) * scale,
-                                                    scale,
-                                                    scale
-                                                )
+                                        for (let y = 0; y < count; ++y) {
+                                            for (let x = 0; x < rows[y].length; ++x) {
+                                                if (rows[y].charAt(x) === "1") {
+                                                    ctx.fillRect(
+                                                        offsetX + (x + quietZone) * scale,
+                                                        offsetY + (y + quietZone) * scale,
+                                                        scale,
+                                                        scale
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                Component.onCompleted: requestPaint()
-                            }
-                        }
-
-                        QQC2.Label {
-                            width: parent.width
-                            visible: !qrCard.visible
-                            text: "QR code unavailable"
-                            horizontalAlignment: Text.AlignHCenter
-                            opacity: 0.7
-                        }
-
-                        QQC2.Label {
-                            width: parent.width
-                            text: "Or open this address manually:"
-                            horizontalAlignment: Text.AlignHCenter
-                            opacity: 0.8
-                        }
-
-                        QQC2.Label {
-                            width: parent.width
-                            text: receiverServer.address
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.WrapAnywhere
-                            font.family: "monospace"
-                            color: Kirigami.Theme.linkColor
-                        }
-
-                        Kirigami.Separator {
-                            width: parent.width
-                        }
-
-                        QQC2.Label {
-                            width: parent.width
-                            text: "Pairing code"
-                            horizontalAlignment: Text.AlignHCenter
-                            opacity: 0.8
-                        }
-
-                        Kirigami.Heading {
-                            width: parent.width
-                            text: receiverServer.pairingCode
-                            level: 1
-                            horizontalAlignment: Text.AlignHCenter
-                        }
-
-                        QQC2.Label {
-                            width: parent.width
-                            text: "Scan the QR code to request device pairing."
-                            wrapMode: Text.Wrap
-                            horizontalAlignment: Text.AlignHCenter
-                            opacity: 0.8
-                        }
-                    }
-                }
-
-                Rectangle {
-                    id: transferCard
-
-                    width: parent.width
-                    height: transferColumn.implicitHeight + 32
-                    radius: 16
-                    color: Kirigami.Theme.backgroundColor
-                    border.width: 1
-                    border.color: Kirigami.Theme.alternateBackgroundColor
-
-                    Column {
-                        id: transferColumn
-
-                        width: parent.width - 32
-                        x: 16
-                        y: 16
-                        spacing: Kirigami.Units.mediumSpacing
-
-                        Kirigami.Heading {
-                            width: parent.width
-                            text: "Transfer files"
-                            level: 2
-                        }
-
-                        QQC2.Label {
-                            width: parent.width
-                            text: "Send files from this computer to your phone."
-                            wrapMode: Text.Wrap
-                            opacity: 0.8
-                        }
-
-                        Rectangle {
-                            id: dropZone
-
-                            width: parent.width
-                            height: 132
-                            radius: 12
-
-                            color: dropArea.containsDrag
-                                   ? Kirigami.Theme.alternateBackgroundColor
-                                   : "transparent"
-
-                            border.width: 2
-                            border.color: dropArea.containsDrag
-                                          ? Kirigami.Theme.highlightColor
-                                          : Kirigami.Theme.disabledTextColor
-
-                            opacity: receiverServer.running ? 1.0 : 0.55
-
-                            Column {
-                                anchors.centerIn: parent
-                                spacing: Kirigami.Units.smallSpacing
-
-                                Kirigami.Icon {
-                                    source: "document-import"
-                                    width: 32
-                                    height: 32
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                }
-
-                                QQC2.Label {
-                                    text: dropArea.containsDrag
-                                          ? "Drop files here"
-                                          : "Drag and drop files here"
-                                    font.weight: Font.DemiBold
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                }
-
-                                QQC2.Label {
-                                    text: "Or use the button below to browse"
-                                    opacity: 0.75
-                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    Component.onCompleted: requestPaint()
                                 }
                             }
 
-                            DropArea {
-                                id: dropArea
-                                anchors.fill: parent
+                            QQC2.Label {
+                                width: parent.width
+                                visible: !qrCard.visible
+                                text: "QR code unavailable"
+                                horizontalAlignment: Text.AlignHCenter
+                                opacity: 0.7
+                            }
+
+                            QQC2.Label {
+                                width: parent.width
+                                text: "Or open this address manually:"
+                                horizontalAlignment: Text.AlignHCenter
+                                opacity: 0.8
+                            }
+
+                            QQC2.Label {
+                                width: parent.width
+                                text: receiverServer.address
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.WrapAnywhere
+                                font.family: "monospace"
+                                color: Kirigami.Theme.linkColor
+                            }
+
+                            QQC2.Button {
+                                width: parent.width
+                                text: "Open Pairing Page on This Computer"
+                                icon.name: "internet-web-browser"
                                 enabled: receiverServer.running
+                                         && receiverServer.pairingUrl.length > 0
 
-                                onDropped: function(drop) {
-                                    const paths = []
-
-                                    for (let i = 0; i < drop.urls.length; ++i) {
-                                        const url = String(drop.urls[i])
-
-                                        if (url.startsWith("file://")) {
-                                            let path = url.replace(/^file:\/\/+/, "/")
-
-                                            try {
-                                                path = decodeURIComponent(path)
-                                            } catch (error) {
-                                                // Keep original path if decoding fails.
-                                            }
-
-                                            paths.push(path)
-                                        }
-                                    }
-
-                                    if (paths.length === 0) {
-                                        shareStatus.text =
-                                            "No local files were found in that drop."
-                                        return
-                                    }
-
-                                    const count = receiverServer.shareFiles(paths)
-
-                                    shareStatus.text = count > 0
-                                        ? count + " file(s) ready to download on your phone."
-                                        : "No files could be shared. Check file permissions."
+                                onClicked: {
+                                    Qt.openUrlExternally(receiverServer.pairingUrl)
                                 }
                             }
-                        }
 
-                        QQC2.Button {
-    width: parent.width
-    text: "Select files to send to phone"
-    icon.name: "document-send"
-    enabled: receiverServer.running
-    highlighted: true
+                            Kirigami.Separator {
+                                width: parent.width
+                            }
 
-    onClicked: receiverServer.openMultiFilePicker()
-}
+                            QQC2.Label {
+                                width: parent.width
+                                text: "Pairing code"
+                                horizontalAlignment: Text.AlignHCenter
+                                opacity: 0.8
+                            }
 
-                        QQC2.Label {
-                            id: shareStatus
-                            width: parent.width
-                            text: ""
-                            wrapMode: Text.Wrap
-                            horizontalAlignment: Text.AlignHCenter
-                        }
+                            Kirigami.Heading {
+                                width: parent.width
+                                text: receiverServer.pairingCode
+                                level: 1
+                                horizontalAlignment: Text.AlignHCenter
+                            }
 
-                        QQC2.Label {
-                            width: parent.width
-
-                            text: receiverServer.sharedFileCount === 0
-                                  ? "No outgoing files selected"
-                                  : receiverServer.sharedFileCount
-                                    + (receiverServer.sharedFileCount === 1
-                                       ? " file ready to send"
-                                       : " files ready to send")
-
-                            visible: receiverServer.running
-                            wrapMode: Text.Wrap
-                            horizontalAlignment: Text.AlignHCenter
-
-                            font.pixelSize: 20
-                            font.weight: Font.DemiBold
-
-                            color: receiverServer.sharedFileCount > 0
-                                   ? Kirigami.Theme.positiveTextColor
-                                   : Kirigami.Theme.disabledTextColor
-                        }
-
-                        Kirigami.Separator {
-                            width: parent.width
-                        }
-
-                        QQC2.Label {
-                            width: parent.width
-                            text: "Incoming transfers require your approval."
-                            wrapMode: Text.Wrap
-                            horizontalAlignment: Text.AlignHCenter
-                            font.weight: Font.Medium
+                            QQC2.Label {
+                                width: parent.width
+                                text: "Scan the QR code to request device pairing."
+                                wrapMode: Text.Wrap
+                                horizontalAlignment: Text.AlignHCenter
+                                opacity: 0.8
+                            }
                         }
                     }
-                         }
+
+                    Rectangle {
+                        id: transferCard
+                        width: parent.width
+                        height: transferColumn.implicitHeight + 32
+                        radius: 16
+                        color: Kirigami.Theme.backgroundColor
+                        border.width: 1
+                        border.color: Kirigami.Theme.alternateBackgroundColor
+
+                        Column {
+                            id: transferColumn
+                            width: parent.width - 32
+                            x: 16
+                            y: 16
+                            spacing: Kirigami.Units.mediumSpacing
+
+                            Kirigami.Heading {
+                                width: parent.width
+                                text: "Transfer files"
+                                level: 2
+                            }
+
+                            QQC2.Label {
+                                width: parent.width
+                                text: "Send files from this computer to your phone."
+                                wrapMode: Text.Wrap
+                                opacity: 0.8
+                            }
+
+                            Rectangle {
+                                id: dropZone
+                                width: parent.width
+                                height: 132
+                                radius: 12
+                                color: dropArea.containsDrag
+                                       ? Kirigami.Theme.alternateBackgroundColor
+                                       : "transparent"
+                                border.width: 2
+                                border.color: dropArea.containsDrag
+                                              ? Kirigami.Theme.highlightColor
+                                              : Kirigami.Theme.disabledTextColor
+                                opacity: receiverServer.running ? 1.0 : 0.55
+
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: Kirigami.Units.smallSpacing
+
+                                    Kirigami.Icon {
+                                        source: "document-import"
+                                        width: 32
+                                        height: 32
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+
+                                    QQC2.Label {
+                                        text: dropArea.containsDrag
+                                              ? "Drop files here"
+                                              : "Drag and drop files here"
+                                        font.weight: Font.DemiBold
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+
+                                    QQC2.Label {
+                                        text: "Or use the button below to browse"
+                                        opacity: 0.75
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                    }
+                                }
+
+                                DropArea {
+                                    id: dropArea
+                                    anchors.fill: parent
+                                    enabled: receiverServer.running
+
+                                    onDropped: function(drop) {
+                                        const paths = []
+
+                                        for (let i = 0; i < drop.urls.length; ++i) {
+                                            const url = String(drop.urls[i])
+
+                                            if (url.startsWith("file://")) {
+                                                let path = url.replace(/^file:\/\/+/, "/")
+
+                                                try {
+                                                    path = decodeURIComponent(path)
+                                                } catch (error) {
+                                                    // Keep original path if decoding fails.
+                                                }
+
+                                                paths.push(path)
+                                            }
+                                        }
+
+                                        if (paths.length === 0) {
+                                            shareStatus.text =
+                                                "No local files were found in that drop."
+                                            return
+                                        }
+
+                                        const count = receiverServer.shareFiles(paths)
+
+                                        shareStatus.text = count > 0
+                                            ? count + " file(s) ready to download on your phone."
+                                            : "No files could be shared. Check file permissions."
+                                    }
+                                }
+                            }
+
+                            QQC2.Button {
+                                width: parent.width
+                                text: "Select files to send to phone"
+                                icon.name: "document-send"
+                                enabled: receiverServer.running
+                                highlighted: true
+                                onClicked: receiverServer.openMultiFilePicker()
+                            }
+
+                            QQC2.Label {
+                                id: shareStatus
+                                width: parent.width
+                                text: ""
+                                wrapMode: Text.Wrap
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            QQC2.Label {
+                                width: parent.width
+                                text: receiverServer.sharedFileCount === 0
+                                      ? "No outgoing files selected"
+                                      : receiverServer.sharedFileCount
+                                        + (receiverServer.sharedFileCount === 1
+                                           ? " file ready to send"
+                                           : " files ready to send")
+                                visible: receiverServer.running
+                                wrapMode: Text.Wrap
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: 20
+                                font.weight: Font.DemiBold
+                                color: receiverServer.sharedFileCount > 0
+                                       ? Kirigami.Theme.positiveTextColor
+                                       : Kirigami.Theme.disabledTextColor
+                            }
+
+                            Kirigami.Separator {
+                                width: parent.width
+                            }
+
+                            QQC2.Label {
+                                width: parent.width
+                                text: "Incoming transfers require your approval."
+                                wrapMode: Text.Wrap
+                                horizontalAlignment: Text.AlignHCenter
+                                font.weight: Font.Medium
+                            }
+                        }
+                    }
+                }
+            }
+
+            Loader {
+                sourceComponent: devicePage
+            }
+
+            Loader {
+                sourceComponent: appearancePage
             }
         }
-
-        Loader {
-            sourceComponent: devicePage
-        }
-
-        Loader {
-            sourceComponent: appearancePage
-        }
-    }
     }
 
     QQC2.Dialog {
@@ -563,7 +551,6 @@ Kirigami.ApplicationWindow {
             QQC2.Button {
                 text: "Reject"
                 QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
-
                 onClicked: {
                     receiverServer.rejectPairing()
                     pairingDialog.close()
@@ -574,7 +561,6 @@ Kirigami.ApplicationWindow {
                 text: "Approve device"
                 highlighted: true
                 QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
-
                 onClicked: {
                     receiverServer.approvePairing()
                     pairingDialog.close()
@@ -634,7 +620,6 @@ Kirigami.ApplicationWindow {
             QQC2.Button {
                 text: "Reject"
                 QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.RejectRole
-
                 onClicked: {
                     receiverServer.rejectRequest()
                     approvalDialog.close()
@@ -645,7 +630,6 @@ Kirigami.ApplicationWindow {
                 text: "Approve transfer"
                 highlighted: true
                 QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
-
                 onClicked: {
                     receiverServer.approveRequest()
                     approvalDialog.close()
@@ -656,9 +640,10 @@ Kirigami.ApplicationWindow {
 
     Component {
         id: devicePage
-Item {
-    anchors.fill: parent
-    objectName: "deviceManagerPage"
+
+        Item {
+            anchors.fill: parent
+            objectName: "deviceManagerPage"
 
             Column {
                 width: parent.width
@@ -688,7 +673,6 @@ Item {
 
                     delegate: Rectangle {
                         required property var modelData
-
                         width: parent.width
                         height: deviceDetails.implicitHeight + 24
                         radius: 12
@@ -698,7 +682,6 @@ Item {
 
                         Row {
                             id: deviceDetails
-
                             x: 12
                             y: 12
                             width: parent.width - 24
@@ -707,14 +690,13 @@ Item {
                             Column {
                                 width: Math.max(
                                     100,
-                                    parent.width - removeButton.width
-                                    - parent.spacing
+                                    parent.width - removeButton.width - parent.spacing
                                 )
                                 spacing: 4
 
                                 QQC2.Label {
                                     width: parent.width
-                                    text: modelData.name
+                                    text: modelData.name || "Unnamed device"
                                     font.bold: true
                                     wrapMode: Text.Wrap
                                 }
@@ -728,35 +710,24 @@ Item {
 
                             QQC2.Button {
                                 id: removeButton
-
                                 text: "Remove"
                                 icon.name: "edit-delete"
                                 anchors.verticalCenter: parent.verticalCenter
-
-                                onClicked: {
-                                    receiverServer.removeTrustedDevice(
-                                        modelData.token
-                                    )
-                                }
+                                onClicked: receiverServer.removeTrustedDevice(modelData.token)
                             }
                         }
                     }
                 }
-
-               
             }
         }
     }
 
-        
-Component {
-    id: appearancePage
+    Component {
+        id: appearancePage
 
-    Item {
-    anchors.fill: parent
-        objectName: "appearanceSettingsPage"
-        
-
+        Item {
+            anchors.fill: parent
+            objectName: "appearanceSettingsPage"
 
             Column {
                 width: parent.width
@@ -781,7 +752,6 @@ Component {
                     width: parent.width
                     model: ["System", "Light", "Dark"]
                     currentIndex: Math.max(0, model.indexOf(appSettings.theme))
-
                     onActivated: appSettings.theme = currentText
                 }
 
@@ -794,7 +764,6 @@ Component {
                     width: parent.width
                     model: ["Blue", "Violet", "Green", "Pink", "Orange"]
                     currentIndex: Math.max(0, model.indexOf(appSettings.accent))
-
                     onActivated: appSettings.accent = currentText
                 }
 
@@ -811,39 +780,34 @@ Component {
                         "CachyOS"
                     ]
                     currentIndex: Math.max(0, model.indexOf(appSettings.style))
-
                     onActivated: appSettings.style = currentText
                 }
 
+                Kirigami.Heading {
+                    text: "Transparency"
+                    level: 3
+                }
 
-Kirigami.Heading {
-    text: "Transparency"
-    level: 3
-}
+                QQC2.Switch {
+                    text: "Enable window transparency"
+                    checked: appSettings.transparencyEnabled
+                    onToggled: appSettings.transparencyEnabled = checked
+                }
 
-QQC2.Switch {
-    text: "Enable window transparency"
-    checked: appSettings.transparencyEnabled
-    onToggled: appSettings.transparencyEnabled = checked
-}
+                QQC2.Label {
+                    text: "Window opacity: "
+                          + Math.round(appSettings.windowOpacity * 100) + "%"
+                }
 
-QQC2.Label {
-    text: "Window opacity: " +
-          Math.round(appSettings.windowOpacity * 100) + "%"
-}
-
-QQC2.Slider {
-    width: parent.width
-    from: 0.60
-    to: 1.0
-    stepSize: 0.05
-    value: appSettings.windowOpacity
-    enabled: appSettings.transparencyEnabled
-
-    onMoved: appSettings.windowOpacity = value
-}
-
-
+                QQC2.Slider {
+                    width: parent.width
+                    from: 0.60
+                    to: 1.0
+                    stepSize: 0.05
+                    value: appSettings.windowOpacity
+                    enabled: appSettings.transparencyEnabled
+                    onMoved: appSettings.windowOpacity = value
+                }
 
                 Kirigami.InlineMessage {
                     width: parent.width
@@ -851,8 +815,6 @@ QQC2.Slider {
                     text: "Your preferences are saved. Visual theme and style changes will be connected in the next step."
                     visible: true
                 }
-
-              
             }
         }
     }

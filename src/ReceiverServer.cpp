@@ -6,6 +6,7 @@
 #include "Network.h"
 #include "QrCodeUtils.h"
 #include "RequestRouter.h"
+#include "CryptoManager.h"
 
 
 #include <QFileDialog>
@@ -28,8 +29,10 @@ constexpr qint64 MaxUploadSize = 100LL * 1024 * 1024;
 
 }
 
-ReceiverServer::ReceiverServer(QObject *parent)
-    : QObject(parent)
+ReceiverServer::ReceiverServer(CryptoManager *cryptoManager,
+                               QObject *parent)
+    : QObject(parent),
+      m_cryptoManager(cryptoManager)
 {
     connect(&m_server, &QTcpServer::newConnection,
             this, &ReceiverServer::handleConnection);
@@ -51,6 +54,10 @@ bool ReceiverServer::running() const
 QString ReceiverServer::address() const
 {
     return m_address;
+}
+QString ReceiverServer::pairingUrl() const
+{
+    return m_pairingUrl;
 }
 
 QString ReceiverServer::pairingCode() const
@@ -178,8 +185,22 @@ bool ReceiverServer::start()
     if (running())
         return true;
 
-    if (!m_server.listen(QHostAddress::AnyIPv4, 8765))
+    if (m_cryptoManager == nullptr) {
+        qWarning() << "Cannot start receiver: CryptoManager is unavailable.";
         return false;
+    }
+
+    QString cryptoError;
+    if (!m_cryptoManager->generateEphemeralKeyPair(&cryptoError)) {
+        qWarning() << "Failed to generate pairing keys:" << cryptoError;
+        return false;
+    }
+
+    if (!m_server.listen(QHostAddress::AnyIPv4, 8765)) {
+        qWarning() << "Failed to start receiver:" << m_server.errorString();
+        m_cryptoManager->clearEphemeralKeyPair();
+        return false;
+    }
 
     m_pairingCode = QString("%1")
         .arg(QRandomGenerator::global()->bounded(1000000),
@@ -192,14 +213,16 @@ bool ReceiverServer::start()
     m_address.clear();
     m_qrRows.clear();
 
-    // Get the receiver URL using the Network helper.
     m_address = Network::serverUrl(8765);
 
-    if (!m_address.isEmpty()) {
-        const QByteArray pairingUrl =
-            (m_address + "/?pair=" + pairingToken).toUtf8();
+        if (!m_address.isEmpty()) {
+        m_pairingUrl =
+            m_address
+            + "/?pair=" + pairingToken
+            + "&key=" + m_cryptoManager->publicKeyHex();
 
-        m_qrRows = QrCodeUtils::generateRows(pairingUrl);
+        m_qrRows =
+            QrCodeUtils::generateRows(m_pairingUrl.toUtf8());
     }
 
     emit runningChanged();
@@ -211,10 +234,10 @@ bool ReceiverServer::start()
 
 void ReceiverServer::stop()
 {
-    if (!running())
-        return;
+    const bool wasRunning = running();
 
-    m_server.close();
+    if (wasRunning)
+        m_server.close();
 
     m_address.clear();
     m_pairingCode.clear();
@@ -225,8 +248,14 @@ void ReceiverServer::stop()
 
     m_pairingManager.stopSession();
 
+    if (m_cryptoManager != nullptr)
+        m_cryptoManager->clearEphemeralKeyPair();
+
     emit sharedFilesChanged();
-    emit runningChanged();
+
+    if (wasRunning)
+        emit runningChanged();
+
     emit pendingRequestChanged();
     emit pairingRequestChanged();
 }

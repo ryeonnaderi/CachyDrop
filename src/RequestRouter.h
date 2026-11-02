@@ -14,4 +14,12 @@ public:
         QTcpSocket *socket,
         const HttpRequestParser::Request &httpRequest
     );
+
+private:
+    static bool verifySignedRequest(
+        ReceiverServer &server,
+        const HttpRequestParser::Request &request,
+        const QString &sessionToken,
+        QString *failure
+    );
 };

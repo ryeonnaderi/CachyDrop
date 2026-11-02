@@ -1,6 +1,9 @@
 
 #pragma once
 
+#include "PairingManager.h"
+
+
 #include <QObject>
 #include <QTcpServer>
 #include <QString>
@@ -9,9 +12,11 @@
 #include <QDateTime>
 #include <QVector>
 #include <QVariant>
-#include "PairingManager.h"
+#include <QByteArray>
+#include <QSet>
+#include <QMutex>
 
-
+class CryptoManager;
 class RequestRouter;
 
 class ReceiverServer : public QObject
@@ -20,6 +25,7 @@ class ReceiverServer : public QObject
 
     Q_PROPERTY(bool running READ running NOTIFY runningChanged)
     Q_PROPERTY(QString address READ address NOTIFY runningChanged)
+    Q_PROPERTY(QString pairingUrl READ pairingUrl NOTIFY runningChanged)
     Q_PROPERTY(QString pairingCode READ pairingCode NOTIFY runningChanged)
     Q_PROPERTY(QStringList qrRows READ qrRows NOTIFY runningChanged)
 
@@ -47,11 +53,12 @@ class ReceiverServer : public QObject
            NOTIFY trustedDevicesChanged)
 
 public:
-    explicit ReceiverServer(QObject *parent = nullptr);
+    explicit ReceiverServer(CryptoManager *cryptoManager, QObject *parent = nullptr);
     Q_INVOKABLE void openMultiFilePicker();
 
     bool running() const;
     QString address() const;
+    QString pairingUrl() const;
     QString pairingCode() const;
     QStringList qrRows() const;
 
@@ -88,7 +95,18 @@ signals:
     void trustedDevicesChanged();
 
 private:
+    CryptoManager *m_cryptoManager = nullptr;
     friend class RequestRouter;
+    QByteArray m_pairingSharedKey;
+
+
+   struct ReplayProtectionState {
+    QHash<QString, qint64> requestIds;
+    QDateTime lastCleanup;
+};
+
+QHash<QString, ReplayProtectionState> m_replayProtection;
+    
     struct TransferFile {
         QString filename;
         qint64 size = 0;
@@ -116,6 +134,7 @@ private:
 
 
     QString m_address;
+    QString m_pairingUrl;
     QString m_pairingCode;
     QString m_activeRequestId;
     QStringList m_qrRows;

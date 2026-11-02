@@ -23,8 +23,9 @@ pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
 qt_standard_project_setup(REQUIRES 6.8)
 
 qt_add_executable(cachydrop
-    src/main.cpp
+
     src/ReceiverServer.cpp
+    src/main.cpp
     src/ReceiverServer.h
     src/WebPages.h
     src/WebPages.cpp
@@ -42,6 +43,15 @@ qt_add_executable(cachydrop
     src/HttpRequestParser.cpp
     src/RequestRouter.h
     src/RequestRouter.cpp
+    src/CryptoManager.h
+    src/CryptoManager.cpp
+)
+qt_add_resources(cachydrop sodium_resources
+    PREFIX "/"
+    BASE third_party/libsodium
+    OPTIONS -no-compress
+    FILES
+        third_party/libsodium/libsodium-bundle.mjs
 )
 
 qt_add_qml_module(cachydrop
@@ -61,6 +71,28 @@ target_link_libraries(cachydrop PRIVATE
     PkgConfig::QRENCODE
     PkgConfig::SODIUM
 )
+
+
+# Standalone CryptoManager encryption tests.
+qt_add_executable(crypto_test
+    tests/CryptoManagerTest.cpp
+    src/CryptoManager.h
+    src/CryptoManager.cpp
+)
+
+target_include_directories(crypto_test PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_link_libraries(crypto_test PRIVATE
+    Qt6::Core
+    PkgConfig::SODIUM
+)
+
+enable_testing()
+add_test(NAME crypto_test COMMAND crypto_test)
+
+
 
 install(TARGETS cachydrop
     RUNTIME DESTINATION bin

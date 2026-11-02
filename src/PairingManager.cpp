@@ -1,66 +1,66 @@
 
 #include "PairingManager.h"
 
+#include <QRandomGenerator>
 #include <QSettings>
-#include <QUuid>
+#include <QCryptographicHash>
+#include <QByteArray>
+#include <QDateTime>
+#include <QVariantMap>
+
+#include <sodium.h>
 
 namespace {
-constexpr int RejectedRequestLifetimeSeconds = 30;
+constexpr int Ed25519PublicKeySize = crypto_sign_PUBLICKEYBYTES;
+constexpr int EncryptionPublicKeySize = crypto_box_PUBLICKEYBYTES;
+
+QString toHexString(const QByteArray &bytes)
+{
+    return QString::fromLatin1(bytes.toHex());
+}
+
+QByteArray fromHexString(const QString &hex)
+{
+    return QByteArray::fromHex(hex.toLatin1());
+}
 }
 
 PairingManager::PairingManager()
 {
+    if (sodium_init() < 0) {
+        return;
+    }
+
     loadTrustedDevices();
 }
 
 QString PairingManager::newToken()
 {
-    return QUuid::createUuid().toString(QUuid::WithoutBraces)
-        + QUuid::createUuid().toString(QUuid::WithoutBraces);
-}
+    QByteArray randomBytes(32, Qt::Uninitialized);
 
-void PairingManager::loadTrustedDevices()
-{
-    QSettings settings;
-    settings.beginGroup(QStringLiteral("trustedDevices"));
+    randombytes_buf(randomBytes.data(),
+                    static_cast<size_t>(randomBytes.size()));
 
-    const QStringList keys = settings.childKeys();
-    for (const QString &token : keys) {
-        m_trustedDevices.insert(token, settings.value(token).toString());
-    }
-
-    settings.endGroup();
-}
-
-void PairingManager::saveTrustedDevice(
-    const QString &token,
-    const QString &device)
-{
-    QSettings settings;
-    settings.beginGroup(QStringLiteral("trustedDevices"));
-    settings.setValue(token, device);
-    settings.endGroup();
-    settings.sync();
+    return QString::fromLatin1(
+        randomBytes.toHex());
 }
 
 QString PairingManager::startNewSession()
 {
+    m_pairingToken = newToken();
+    m_activePairingId.clear();
     m_pairings.clear();
     m_sessions.clear();
-    m_activePairingId.clear();
 
-    m_pairingToken = newToken();
     return m_pairingToken;
 }
 
 void PairingManager::stopSession()
 {
     m_pairingToken.clear();
+    m_activePairingId.clear();
     m_pairings.clear();
     m_sessions.clear();
-    m_activePairingId.clear();
-
-    // Deliberately preserve m_trustedDevices and its settings.
 }
 
 QString PairingManager::pairingToken() const
@@ -71,12 +71,16 @@ QString PairingManager::pairingToken() const
 bool PairingManager::hasPendingPairing() const
 {
     const auto it = m_pairings.constFind(m_activePairingId);
-    return it != m_pairings.cend() && it->state == QStringLiteral("pending");
+
+    return it != m_pairings.cend()
+        && it->state == QStringLiteral("pending")
+        && it->expiresAt > QDateTime::currentDateTimeUtc();
 }
 
 QString PairingManager::pendingDevice() const
 {
     const auto it = m_pairings.constFind(m_activePairingId);
+
     if (it == m_pairings.cend()
         || it->state != QStringLiteral("pending")) {
         return {};
@@ -90,11 +94,127 @@ QString PairingManager::activePairingId() const
     return m_activePairingId;
 }
 
+void PairingManager::loadTrustedDevices()
+{
+    QSettings settings;
+
+    QHash<QString, QString> loadedDevices;
+    QHash<QString, QByteArray> loadedSigningKeys;
+    QHash<QString, QByteArray> loadedEncryptionKeys;
+
+    // Load device names first.
+    settings.beginGroup(QStringLiteral("trustedDevices"));
+
+    for (const QString &token : settings.childKeys()) {
+        loadedDevices.insert(
+            token,
+            settings.value(token).toString());
+    }
+
+    settings.endGroup();
+
+    // Load signing public keys only for known devices.
+    settings.beginGroup(
+        QStringLiteral("trustedDeviceSigningKeys"));
+
+    for (const QString &token : settings.childKeys()) {
+        if (!loadedDevices.contains(token)) {
+            continue;
+        }
+
+        const QByteArray key = fromHexString(
+            settings.value(token).toString());
+
+        if (key.size() == Ed25519PublicKeySize) {
+            loadedSigningKeys.insert(token, key);
+        }
+    }
+
+    settings.endGroup();
+
+    // Load encryption public keys only for known devices.
+    settings.beginGroup(
+        QStringLiteral("trustedDeviceEncryptionKeys"));
+
+    for (const QString &token : settings.childKeys()) {
+        if (!loadedDevices.contains(token)) {
+            continue;
+        }
+
+        const QByteArray key = fromHexString(
+            settings.value(token).toString());
+
+        if (key.size() == EncryptionPublicKeySize) {
+            loadedEncryptionKeys.insert(token, key);
+        }
+    }
+
+    settings.endGroup();
+
+    m_trustedDevices = loadedDevices;
+    m_trustedSigningKeys = loadedSigningKeys;
+    m_trustedEncryptionKeys = loadedEncryptionKeys;
+}
+
+bool PairingManager::saveTrustedDevice(
+    const QString &token,
+    const QString &device,
+    const QByteArray &signingPublicKey,
+    const QByteArray &encryptionPublicKey)
+{
+    if (token.isEmpty() || device.isEmpty()) {
+        return false;
+    }
+
+    if (!signingPublicKey.isEmpty()
+        && signingPublicKey.size() != Ed25519PublicKeySize) {
+        return false;
+    }
+
+    if (encryptionPublicKey.size() != EncryptionPublicKeySize) {
+        return false;
+    }
+
+    QSettings settings;
+
+    settings.beginGroup(QStringLiteral("trustedDevices"));
+    settings.setValue(token, device);
+    settings.endGroup();
+
+    settings.beginGroup(
+        QStringLiteral("trustedDeviceSigningKeys"));
+
+    if (signingPublicKey.isEmpty()) {
+        settings.remove(token);
+    } else {
+        settings.setValue(
+            token,
+            toHexString(signingPublicKey));
+    }
+
+    settings.endGroup();
+
+    settings.beginGroup(
+        QStringLiteral("trustedDeviceEncryptionKeys"));
+
+    settings.setValue(
+        token,
+        toHexString(encryptionPublicKey));
+
+    settings.endGroup();
+
+    settings.sync();
+
+    return settings.status() == QSettings::NoError;
+}
+
 PairingManager::CreateResult PairingManager::createRequest(
     const QString &presentedToken,
     const QString &device,
     int lifetimeSeconds,
-    QString *requestId)
+    QString *requestId,
+    const QByteArray &signingPublicKey,
+    const QByteArray &encryptionPublicKey)
 {
     if (presentedToken.isEmpty()
         || presentedToken != m_pairingToken) {
@@ -105,17 +225,34 @@ PairingManager::CreateResult PairingManager::createRequest(
         return CreateResult::AlreadyPending;
     }
 
-    PairingRequest request;
-    request.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    request.device = device.trimmed().left(100);
-    if (request.device.isEmpty()) {
-        request.device = QStringLiteral("Unknown device");
+    const QString normalizedDevice = device.trimmed();
+
+if (normalizedDevice.isEmpty() || normalizedDevice.size() > 128) {
+    return CreateResult::InvalidToken;
+}
+
+    if (!signingPublicKey.isEmpty()
+        && signingPublicKey.size() != Ed25519PublicKeySize) {
+        return CreateResult::InvalidToken;
     }
 
+    if (encryptionPublicKey.size() != EncryptionPublicKeySize) {
+        return CreateResult::InvalidToken;
+    }
+
+    if (lifetimeSeconds <= 0) {
+        return CreateResult::InvalidToken;
+    }
+
+    PairingRequest request;
+    request.id = newToken();
+    request.device = normalizedDevice;
     request.sessionToken = newToken();
     request.state = QStringLiteral("pending");
     request.expiresAt = QDateTime::currentDateTimeUtc()
-        .addSecs(qMax(1, lifetimeSeconds));
+        .addSecs(lifetimeSeconds);
+    request.signingPublicKey = signingPublicKey;
+    request.encryptionPublicKey = encryptionPublicKey;
 
     m_activePairingId = request.id;
     m_pairings.insert(request.id, request);
@@ -130,17 +267,43 @@ PairingManager::CreateResult PairingManager::createRequest(
 bool PairingManager::approvePairing()
 {
     auto it = m_pairings.find(m_activePairingId);
+
     if (it == m_pairings.end()
         || it->state != QStringLiteral("pending")
         || it->expiresAt <= QDateTime::currentDateTimeUtc()) {
         return false;
     }
 
-    it->state = QStringLiteral("approved");
+    // Persist the device and public keys before authorizing it.
+    if (!saveTrustedDevice(
+            it->sessionToken,
+            it->device,
+            it->signingPublicKey,
+            it->encryptionPublicKey)) {
+        return false;
+    }
 
-    m_sessions.insert(it->sessionToken, it->device);
-    m_trustedDevices.insert(it->sessionToken, it->device);
-    saveTrustedDevice(it->sessionToken, it->device);
+    m_trustedDevices.insert(
+        it->sessionToken,
+        it->device);
+
+    if (it->signingPublicKey.isEmpty()) {
+        m_trustedSigningKeys.remove(it->sessionToken);
+    } else {
+        m_trustedSigningKeys.insert(
+            it->sessionToken,
+            it->signingPublicKey);
+    }
+
+    m_trustedEncryptionKeys.insert(
+        it->sessionToken,
+        it->encryptionPublicKey);
+
+    m_sessions.insert(
+        it->sessionToken,
+        it->device);
+
+    it->state = QStringLiteral("approved");
 
     return true;
 }
@@ -148,15 +311,13 @@ bool PairingManager::approvePairing()
 bool PairingManager::rejectPairing()
 {
     auto it = m_pairings.find(m_activePairingId);
+
     if (it == m_pairings.end()
         || it->state != QStringLiteral("pending")) {
         return false;
     }
 
     it->state = QStringLiteral("rejected");
-    it->expiresAt = QDateTime::currentDateTimeUtc()
-        .addSecs(RejectedRequestLifetimeSeconds);
-
     return true;
 }
 
@@ -166,9 +327,22 @@ bool PairingManager::pairingStatus(
     QString *sessionToken) const
 {
     const auto it = m_pairings.constFind(id);
-    if (it == m_pairings.cend()
-        || it->expiresAt <= QDateTime::currentDateTimeUtc()) {
+
+    if (it == m_pairings.cend()) {
         return false;
+    }
+
+    if (it->state == QStringLiteral("pending")
+        && it->expiresAt <= QDateTime::currentDateTimeUtc()) {
+        if (state) {
+            *state = QStringLiteral("expired");
+        }
+
+        if (sessionToken) {
+            sessionToken->clear();
+        }
+
+        return true;
     }
 
     if (state) {
@@ -176,9 +350,11 @@ bool PairingManager::pairingStatus(
     }
 
     if (sessionToken) {
-        *sessionToken = it->state == QStringLiteral("approved")
-            ? it->sessionToken
-            : QString();
+        if (it->state == QStringLiteral("approved")) {
+            *sessionToken = it->sessionToken;
+        } else {
+            sessionToken->clear();
+        }
     }
 
     return true;
@@ -186,48 +362,60 @@ bool PairingManager::pairingStatus(
 
 bool PairingManager::expireRequests(const QDateTime &now)
 {
-    bool changed = false;
+    bool expiredAny = false;
 
-    for (auto it = m_pairings.begin(); it != m_pairings.end();) {
-        if (it->expiresAt <= now) {
-            if (it.key() == m_activePairingId) {
-                m_activePairingId.clear();
-            }
-            it = m_pairings.erase(it);
-            changed = true;
-        } else {
-            ++it;
+    for (auto it = m_pairings.begin();
+         it != m_pairings.end();
+         ++it) {
+        if (it->state == QStringLiteral("pending")
+            && it->expiresAt <= now) {
+            it->state = QStringLiteral("expired");
+            expiredAny = true;
         }
     }
 
-    return changed;
+    return expiredAny;
 }
 
 bool PairingManager::isAuthorized(const QString &token) const
 {
     return !token.isEmpty()
-        && (m_sessions.contains(token)
-            || m_trustedDevices.contains(token));
+        && m_trustedDevices.contains(token);
 }
 
 QString PairingManager::sessionDevice(const QString &token) const
 {
-    return m_sessions.value(token, m_trustedDevices.value(token));
+    return m_trustedDevices.value(token);
+}
+
+QByteArray PairingManager::trustedDeviceSigningKey(
+    const QString &token) const
+{
+    return m_trustedSigningKeys.value(token);
+}
+
+QByteArray PairingManager::trustedDeviceEncryptionKey(
+    const QString &token) const
+{
+    return m_trustedEncryptionKeys.value(token);
 }
 
 QVariantList PairingManager::trustedDeviceList() const
 {
-    QVariantList result;
+    QVariantList devices;
 
     for (auto it = m_trustedDevices.cbegin();
-         it != m_trustedDevices.cend(); ++it) {
+         it != m_trustedDevices.cend();
+         ++it) {
         QVariantMap item;
+
         item.insert(QStringLiteral("token"), it.key());
-        item.insert(QStringLiteral("name"), it.value());
-        result.append(item);
+        item.insert(QStringLiteral("device"), it.value());
+
+        devices.append(item);
     }
 
-    return result;
+    return devices;
 }
 
 bool PairingManager::removeTrustedDevice(const QString &token)
@@ -236,14 +424,31 @@ bool PairingManager::removeTrustedDevice(const QString &token)
         return false;
     }
 
-    m_trustedDevices.remove(token);
-    m_sessions.remove(token);
-
     QSettings settings;
+
     settings.beginGroup(QStringLiteral("trustedDevices"));
     settings.remove(token);
     settings.endGroup();
-    settings.sync();
 
-    return true;
+    settings.beginGroup(
+        QStringLiteral("trustedDeviceSigningKeys"));
+    settings.remove(token);
+    settings.endGroup();
+
+    settings.beginGroup(
+        QStringLiteral("trustedDeviceEncryptionKeys"));
+    settings.remove(token);
+    settings.endGroup();
+
+   settings.sync();
+
+const bool saved = settings.status() == QSettings::NoError;
+
+// Revoke the device in memory regardless of persistence success.
+m_trustedDevices.remove(token);
+m_trustedSigningKeys.remove(token);
+m_trustedEncryptionKeys.remove(token);
+m_sessions.remove(token);
+
+return saved;
 }

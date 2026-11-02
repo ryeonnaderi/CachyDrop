@@ -40,38 +40,92 @@ Result parse(const QByteArray &buffer)
     const QList<QByteArray> firstLine =
         lines.first().trimmed().split(' ');
 
-    if (firstLine.size() < 2 ||
+    if (firstLine.size() != 3 ||
         firstLine.at(0).isEmpty() ||
-        firstLine.at(1).isEmpty()) {
+        firstLine.at(1).isEmpty() ||
+        firstLine.at(2) != "HTTP/1.1") {
         result.status = Status::Error;
         result.errorStatus = "400 Bad Request";
-        result.errorMessage = "Bad request";
+        result.errorMessage = "Invalid request line";
         return result;
     }
 
+    const QByteArray method = firstLine.at(0);
+    const QByteArray target = firstLine.at(1);
+
+    // This server accepts origin-form targets, e.g. /request?a=1.
+    // Preserve these exact bytes for later signature verification.
+    if (!target.startsWith('/') ||
+        target.startsWith("//") ||
+        target.contains('#') ||
+        target.contains('\r') ||
+        target.contains('\n')) {
+        result.status = Status::Error;
+        result.errorStatus = "400 Bad Request";
+        result.errorMessage = "Invalid request target";
+        return result;
+    }
+
+    
     qint64 contentLength = 0;
     bool foundContentLength = false;
 
-    for (const QByteArray &line : lines) {
+    for (qsizetype i = 1; i < lines.size(); ++i) {
+    const QByteArray &line = lines.at(i);
         const QByteArray trimmed = line.trimmed();
+        const qsizetype colon = trimmed.indexOf(':');
 
-        if (trimmed.toLower().startsWith("content-length:")) {
+       if (colon <= 0) {
+    result.status = Status::Error;
+    result.errorStatus = "400 Bad Request";
+    result.errorMessage = "Malformed HTTP header";
+    return result;
+}
+
+
+const QByteArray rawName = trimmed.left(colon);
+
+for (const char ch : rawName) {
+    const bool valid =
+        (ch >= 'A' && ch <= 'Z') ||
+        (ch >= 'a' && ch <= 'z') ||
+        (ch >= '0' && ch <= '9') ||
+        QByteArray("!#$%&'*+-.^_`|~").contains(ch);
+
+    if (!valid) {
+        result.status = Status::Error;
+        result.errorStatus = "400 Bad Request";
+        result.errorMessage = "Invalid HTTP header name";
+        return result;
+    }
+}
+
+
+        const QByteArray name =
+            trimmed.left(colon).trimmed().toLower();
+        const QByteArray value =
+            trimmed.mid(colon + 1).trimmed();
+
+        if (name == "transfer-encoding") {
+            result.status = Status::Error;
+            result.errorStatus = "400 Bad Request";
+            result.errorMessage = "Transfer-Encoding is not supported";
+            return result;
+        }
+
+        if (name == "content-length") {
             bool ok = false;
+            const qint64 parsedLength = value.toLongLong(&ok);
 
-            const qint64 value =
-                trimmed.mid(trimmed.indexOf(':') + 1)
-                    .trimmed()
-                    .toLongLong(&ok);
-
-            if (!ok || value < 0 ||
-                (foundContentLength && value != contentLength)) {
+            // Reject duplicate Content-Length headers, even if identical.
+            if (foundContentLength || !ok || parsedLength < 0) {
                 result.status = Status::Error;
                 result.errorStatus = "400 Bad Request";
                 result.errorMessage = "Invalid Content-Length";
                 return result;
             }
 
-            contentLength = value;
+            contentLength = parsedLength;
             foundContentLength = true;
         }
     }
@@ -83,25 +137,27 @@ Result parse(const QByteArray &buffer)
         return result;
     }
 
+
     const qsizetype bodyStart = headerEnd + 4;
 
     if (buffer.size() - bodyStart < contentLength)
         return result;
 
-    const QByteArray target = firstLine.at(1);
-
     const QUrl url(
         QStringLiteral("http://localhost") +
         QString::fromUtf8(target));
 
-    if (!url.isValid() || url.path().isEmpty()) {
+    if (!url.isValid() ||
+        url.path().isEmpty() ||
+        !url.fragment().isEmpty()) {
         result.status = Status::Error;
         result.errorStatus = "400 Bad Request";
-        result.errorMessage = "Bad request";
+        result.errorMessage = "Invalid request URL";
         return result;
     }
 
-    result.request.method = firstLine.at(0);
+    result.request.method = method;
+    result.request.rawTarget = target;
     result.request.url = url;
     result.request.query = QUrlQuery(url);
     result.request.body = buffer.mid(bodyStart, contentLength);

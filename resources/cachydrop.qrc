@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="libsodium-bundle.mjs">../third_party/libsodium/libsodium-bundle.mjs</file>
+  </qresource>
+</RCC>

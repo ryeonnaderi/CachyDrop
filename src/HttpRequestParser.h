@@ -18,6 +18,7 @@ enum class Status {
 struct Request
 {
     QByteArray method;
+    QByteArray rawTarget; // Original request path and query, unchanged
     QUrl url;
     QByteArray body;
     QList<QByteArray> headerLines;

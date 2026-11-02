@@ -8,7 +8,8 @@
 #include <QStringList>
 #include <QWindow>
 #include <QQuickWindow>
-
+#include "CryptoManager.h"
+#include <QDebug>
 #include "ReceiverServer.h"
 
 int main(int argc, char *argv[])
@@ -16,11 +17,23 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QQuickWindow::setDefaultAlphaBuffer(true);
 
-    QGuiApplication::setApplicationName("CachyDrop");
-    QGuiApplication::setOrganizationName("CachyDrop");
+   QGuiApplication::setApplicationName("CachyDrop");
+   QGuiApplication::setOrganizationName("CachyDrop");
+   
+   CryptoManager cryptoManager;
+   QString cryptoError;
 
-    ReceiverServer receiverServer;
-    QQmlApplicationEngine engine;
+if (!cryptoManager.initialize(&cryptoError)) {
+    qCritical() << "Cryptographic initialization failed:"
+                << cryptoError;
+    return -1;
+}
+
+qInfo() << "Cryptographic identity initialized.";
+qInfo() << "Public key:" << cryptoManager.publicKeyHex();
+
+ReceiverServer receiverServer(&cryptoManager);
+QQmlApplicationEngine engine;
 
     engine.rootContext()->setContextProperty(
         "receiverServer", &receiverServer);
