@@ -264,7 +264,8 @@ if (normalizedDevice.isEmpty() || normalizedDevice.size() > 128) {
     return CreateResult::Created;
 }
 
-bool PairingManager::approvePairing()
+
+bool PairingManager::approvePairing(const QString &deviceName)
 {
     auto it = m_pairings.find(m_activePairingId);
 
@@ -274,10 +275,16 @@ bool PairingManager::approvePairing()
         return false;
     }
 
-    // Persist the device and public keys before authorizing it.
+    const QString normalizedName = deviceName.trimmed();
+
+    if (normalizedName.isEmpty() || normalizedName.size() > 128) {
+        return false;
+    }
+
+    // Persist the custom device name and public keys before authorizing it.
     if (!saveTrustedDevice(
             it->sessionToken,
-            it->device,
+            normalizedName,
             it->signingPublicKey,
             it->encryptionPublicKey)) {
         return false;
@@ -285,7 +292,7 @@ bool PairingManager::approvePairing()
 
     m_trustedDevices.insert(
         it->sessionToken,
-        it->device);
+        normalizedName);
 
     if (it->signingPublicKey.isEmpty()) {
         m_trustedSigningKeys.remove(it->sessionToken);
@@ -301,12 +308,13 @@ bool PairingManager::approvePairing()
 
     m_sessions.insert(
         it->sessionToken,
-        it->device);
+        normalizedName);
 
     it->state = QStringLiteral("approved");
 
     return true;
 }
+
 
 bool PairingManager::rejectPairing()
 {
@@ -410,14 +418,13 @@ QVariantList PairingManager::trustedDeviceList() const
         QVariantMap item;
 
         item.insert(QStringLiteral("token"), it.key());
-        item.insert(QStringLiteral("device"), it.value());
+        item.insert(QStringLiteral("name"), it.value());
 
         devices.append(item);
     }
 
     return devices;
 }
-
 bool PairingManager::removeTrustedDevice(const QString &token)
 {
     if (!m_trustedDevices.contains(token)) {

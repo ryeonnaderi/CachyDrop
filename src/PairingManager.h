@@ -34,7 +34,7 @@ public:
         const QByteArray &signingPublicKey = QByteArray(),
         const QByteArray &encryptionPublicKey = QByteArray());
 
-    bool approvePairing();
+    bool approvePairing(const QString &deviceName);
     bool rejectPairing();
 
     bool pairingStatus(

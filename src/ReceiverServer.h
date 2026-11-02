@@ -84,7 +84,7 @@ public:
     Q_INVOKABLE void approveRequest();
     Q_INVOKABLE void rejectRequest();
 
-    Q_INVOKABLE void approvePairing();
+    Q_INVOKABLE void approvePairing(const QString &deviceName);
     Q_INVOKABLE void rejectPairing();
 
 signals:

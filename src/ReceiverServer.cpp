@@ -285,9 +285,9 @@ void ReceiverServer::rejectRequest()
     emit pendingRequestChanged();
 }
 
-void ReceiverServer::approvePairing()
+void ReceiverServer::approvePairing(const QString &deviceName)
 {
-    if (!m_pairingManager.approvePairing())
+    if (!m_pairingManager.approvePairing(deviceName))
         return;
 
     emit pairingRequestChanged();

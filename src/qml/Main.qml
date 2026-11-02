@@ -535,12 +535,26 @@ QQC2.Button {
                 wrapMode: Text.Wrap
             }
 
-            QQC2.Label {
-                width: parent.width
-                text: "Device: " + receiverServer.pendingDevice
-                wrapMode: Text.Wrap
-                font.bold: true
-            }
+          QQC2.Label {
+    width: parent.width
+    text: "Detected device: " + receiverServer.pendingDevice
+    wrapMode: Text.Wrap
+    font.bold: true
+}
+
+QQC2.Label {
+    width: parent.width
+    text: "Choose a name for this device:"
+    wrapMode: Text.Wrap
+}
+
+QQC2.TextField {
+    id: pairingDeviceNameField
+    width: parent.width
+    text: receiverServer.pendingDevice
+    placeholderText: "Enter device name"
+    maximumLength: 128
+}
 
             QQC2.Label {
                 width: parent.width
@@ -563,14 +577,19 @@ QQC2.Button {
             }
 
             QQC2.Button {
-                text: "Approve device"
-                highlighted: true
-                QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
-                onClicked: {
-                    receiverServer.approvePairing()
-                    pairingDialog.close()
-                }
-            }
+    text: "Approve device"
+    highlighted: true
+    enabled: pairingDeviceNameField.text.trim().length > 0
+
+    QQC2.DialogButtonBox.buttonRole: QQC2.DialogButtonBox.AcceptRole
+
+    onClicked: {
+        receiverServer.approvePairing(
+            pairingDeviceNameField.text.trim()
+        )
+        pairingDialog.close()
+    }
+}
         }
     }
 
