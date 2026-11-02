@@ -8,6 +8,7 @@ import QtQuick.Layouts
 Kirigami.ApplicationWindow {
     id: root
     property int selectedPage: 0
+    property bool showQrCode: false
 
     globalDrawer: Kirigami.GlobalDrawer {
         id: navigationDrawer
@@ -151,24 +152,28 @@ Kirigami.ApplicationWindow {
                         }
                     }
 
-                    QQC2.Button {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: receiverServer.running
-                              ? "Stop receiving"
-                              : "Start receiving"
-                        icon.name: receiverServer.running
-                                   ? "media-playback-stop"
-                                   : "download"
-                        highlighted: true
+                    
+QQC2.Button {
+    anchors.horizontalCenter: parent.horizontalCenter
+    text: receiverServer.running
+          ? "Stop receiving"
+          : "Start receiving"
+    icon.name: receiverServer.running
+               ? "media-playback-stop"
+               : "download"
+    highlighted: true
 
-                        onClicked: {
-                            if (receiverServer.running) {
-                                receiverServer.stop()
-                            } else if (!receiverServer.start()) {
-                                errorDialog.open()
-                            }
-                        }
-                    }
+    onClicked: {
+        root.showQrCode = false
+
+        if (receiverServer.running) {
+            receiverServer.stop()
+        } else if (!receiverServer.start()) {
+            errorDialog.open()
+        }
+    }
+}
+
 
                     Rectangle {
                         id: connectionCard
@@ -194,12 +199,11 @@ Kirigami.ApplicationWindow {
                                 horizontalAlignment: Text.AlignHCenter
                             }
 
-                            QQC2.Label {
+                            QQC2.Button {
                                 width: parent.width
-                                text: "Scan this QR code with your phone camera."
-                                wrapMode: Text.Wrap
-                                horizontalAlignment: Text.AlignHCenter
-                                opacity: 0.8
+                                text: root.showQrCode ? "Hide QR Code" : "Show QR Code"
+                                icon.name: root.showQrCode ? "view-hidden" : "view-barcode"
+                                onClicked: root.showQrCode = !root.showQrCode
                             }
 
                             Rectangle {
@@ -210,7 +214,7 @@ Kirigami.ApplicationWindow {
                                 color: "#ffffff"
                                 border.width: 1
                                 border.color: "#d8dce3"
-                                visible: receiverServer.qrRows.length > 0
+                                visible: root.showQrCode && receiverServer.qrRows.length > 0
                                 anchors.horizontalCenter: parent.horizontalCenter
 
                                 Canvas {
@@ -265,7 +269,7 @@ Kirigami.ApplicationWindow {
 
                             QQC2.Label {
                                 width: parent.width
-                                visible: !qrCard.visible
+                                visible: root.showQrCode && receiverServer.qrRows.length === 0
                                 text: "QR code unavailable"
                                 horizontalAlignment: Text.AlignHCenter
                                 opacity: 0.7
@@ -286,7 +290,7 @@ Kirigami.ApplicationWindow {
                                 font.family: "monospace"
                                 color: Kirigami.Theme.linkColor
                             }
-
+                            /*
                             QQC2.Button {
                                 width: parent.width
                                 text: "Open Pairing Page on This Computer"
@@ -298,6 +302,7 @@ Kirigami.ApplicationWindow {
                                     Qt.openUrlExternally(receiverServer.pairingUrl)
                                 }
                             }
+                            */
 
                             Kirigami.Separator {
                                 width: parent.width
