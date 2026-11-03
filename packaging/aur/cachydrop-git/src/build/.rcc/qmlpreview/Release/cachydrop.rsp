@@ -1,0 +1,10 @@
+--interactive
+--resource
+/home/ryeon/Desktop/CachyDrop/packaging/aur/cachydrop-git/src/build/.qt/rcc/sodium_resources.qrc
+--resource
+/home/ryeon/Desktop/CachyDrop/packaging/aur/cachydrop-git/src/build/.qt/rcc/qmake_CachyDrop.qrc
+--resource
+/home/ryeon/Desktop/CachyDrop/packaging/aur/cachydrop-git/src/build/.qt/rcc/cachydrop_raw_qml_0.qrc
+--resource
+/home/ryeon/Desktop/CachyDrop/packaging/aur/cachydrop-git/src/build/.qt/rcc/cachydrop_raw_qml_0_extra_qmldirs.qrc
+/home/ryeon/Desktop/CachyDrop/packaging/aur/cachydrop-git/src/build/cachydrop

@@ -9,7 +9,6 @@
 #include <QWindow>
 #include <QQuickWindow>
 #include "CryptoManager.h"
-#include <QDebug>
 #include "ReceiverServer.h"
 
 int main(int argc, char *argv[])
@@ -28,9 +27,6 @@ if (!cryptoManager.initialize(&cryptoError)) {
                 << cryptoError;
     return -1;
 }
-
-qInfo() << "Cryptographic identity initialized.";
-qInfo() << "Public key:" << cryptoManager.publicKeyHex();
 
 ReceiverServer receiverServer(&cryptoManager);
 QQmlApplicationEngine engine;

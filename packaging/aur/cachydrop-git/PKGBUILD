@@ -1,0 +1,48 @@
+
+# Maintainer: ryeonnaderi
+pkgname=cachydrop-git
+pkgver=0.1.0.r16.ge9b0ff5
+pkgrel=1
+pkgdesc="Local file transfers between Linux computers and phones"
+arch=('x86_64')
+url="https://github.com/ryeonnaderi/CachyDrop"
+license=('custom:unknown')
+depends=(
+  'qt6-base'
+  'qt6-declarative'
+  'qt6-shadertools'
+  'kirigami'
+  'qrencode'
+  'libsodium'
+)
+makedepends=(
+  'git'
+  'cmake'
+  'gcc'
+  'pkgconf'
+  'ninja'
+)
+provides=('cachydrop')
+conflicts=('cachydrop')
+
+source=("CachyDrop::git+https://github.com/ryeonnaderi/CachyDrop.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/CachyDrop"
+  printf '0.1.0.r%s.g%s' \
+    "$(git rev-list --count HEAD)" \
+    "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cmake -S "$srcdir/CachyDrop" -B "$srcdir/build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -G Ninja
+  cmake --build "$srcdir/build"
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install "$srcdir/build"
+}

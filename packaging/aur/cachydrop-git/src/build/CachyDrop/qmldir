@@ -1,0 +1,6 @@
+module CachyDrop
+typeinfo cachydrop.qmltypes
+prefer :/qt/qml/CachyDrop/
+Main 1.0 src/qml/Main.qml
+depends QtQuick
+
