@@ -1,205 +1,205 @@
 # CachyDrop
 
-**Simple, secure-minded file transfers between your Linux computer and phone.**
+**A simple Linux desktop application for transferring files between your computer and your phone over a local network.**
 
-CachyDrop is a Linux desktop application designed to make transferring files between your computer and mobile phone simple and convenient. It provides a native desktop interface with QR-code connection details, device pairing, transfer approval, and appearance customization.
+CachyDrop is built with C++, Qt 6, Qt Quick, and KDE Kirigami. It provides a native desktop interface for connecting devices, managing pairing requests, and controlling incoming file transfers.
 
-Built with C++, Qt Quick, and KDE Kirigami, CachyDrop aims to make local file sharing straightforward while keeping users in control of connected devices and incoming transfers.
-
-> **Development status:** CachyDrop is under active development. The desktop interface, receiving server, HTTP request routing, pairing workflows, and file-transfer functionality are being developed and refined. Public/private-key management and encrypted file transfers remain security development goals until their implementation and verification are complete.
+> [!WARNING]
+> **Active development:** CachyDrop is still under development. Security-sensitive functionality, including cryptographic identity management, authenticated key exchange, and encrypted file transfers, must not be assumed to be fully implemented or security-audited. Do not use it to transfer sensitive files until these protections have been implemented and verified.
 
 ## Features
 
-- **QR-code connections** — Connect a phone using the connection information displayed by the application.
-- **Local file sharing** — Select files or drag and drop them into the application to prepare them for transfer.
+- **QR-code pairing** — Connect a phone to your computer using the connection details displayed by CachyDrop.
+- **Local file sharing** — Select files using the file picker or drag and drop them into the application.
 - **Incoming transfer approval** — Review incoming transfer requests and approve or reject them.
-- **Device pairing** — Handle pairing requests and authorize devices.
+- **Device pairing** — Handle pairing requests and authorize devices before granting access.
+- **Custom device names** — Assign recognizable names to paired devices, including phones and tablets whose browsers don't expose their actual device names.
 - **Trusted device management** — View paired devices and remove saved authorizations.
-- **Transfer status** — View receiving-server status, transfer requests, and files available for sharing.
-- **HTTP request routing** — Handle HTTP endpoints through a dedicated `RequestRouter` component, separate from the receiving server's connection-handling logic.
-- **Appearance customization** — Configure available theme, accent color, interface style, and transparency options.
-- **Native desktop interface** — Built with Qt Quick and KDE Kirigami.
+- **Transfer status** — View the receiving server's status and relevant transfer information.
+- **Appearance customization** — Configure available themes, accent colors, interface styles, and transparency options.
+- **Native Linux interface** — Built with Qt Quick and KDE Kirigami.
 
-## Technology stack
+Features and workflows may change as development continues.
 
-- C++
-- Qt 6
-- Qt Quick and QML
-- Qt Quick Controls
-- KDE Kirigami
-- CMake
-- Unix Makefiles for the current configured build
-- libsodium for cryptographic functionality where configured and used
+## Screenshots
+
+Screenshots will be added as the interface and workflows mature.
 
 ## Requirements
 
-CachyDrop is developed primarily for Linux, including Arch Linux and CachyOS.
+CachyDrop is primarily developed for Linux, with CachyOS and Arch Linux as development targets.
 
-You will generally need:
+The build requires:
 
-- A C++ compiler
+- A C++ compiler with C++20 support
 - CMake
-- Qt 6 development packages
-- Qt Quick / Qt Declarative
+- Qt 6, including Qt Quick and QML support
+- Qt Quick Controls
 - Qt Shader Tools
 - KDE Kirigami
-- Additional libraries required by the current `CMakeLists.txt`
+- `qrencode`
+- `libsodium`
+- Other dependencies required by the current CMake configuration
 
-### Install dependencies on Arch Linux or CachyOS
-
-Start with:
-
-```bash
-sudo pacman -S --needed \
-    base-devel \
-    cmake \
-    qt6-base \
-    qt6-declarative \
-    qt6-shadertools \
-    kirigami
-```
-
-Install any additional dependencies required by the project's build configuration. If your current configuration requires libsodium, install it with:
-
-```bash
-sudo pacman -S --needed libsodium
-```
-
-The exact dependency list may change as development progresses.
+The exact dependency requirements may change as the project evolves.
 
 ## Build from source
 
-### 1. Clone the repository
+### 1. Install dependencies
+
+On CachyOS or Arch Linux, install the common build dependencies:
+
+```bash
+sudo pacman -S --needed \
+  base-devel \
+  git \
+  cmake \
+  pkgconf \
+  qt6-base \
+  qt6-declarative \
+  qt6-shadertools \
+  kirigami \
+  qrencode \
+  libsodium
+```
+
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/ryeonnaderi/CachyDrop.git
 cd CachyDrop
 ```
 
-If you already have the source code, open a terminal in the project directory instead.
-
-### 2. Configure the project
+### 3. Configure the project
 
 ```bash
 cmake -S . -B build
 ```
 
-The current build configuration uses **Unix Makefiles**. CMake selects the default available generator when creating a new build directory.
+CMake will select an available build generator. The current development setup uses Unix Makefiles.
 
-### 3. Build CachyDrop
+### 4. Build CachyDrop
 
 ```bash
 cmake --build build
 ```
 
-### 4. Run CachyDrop
+### 5. Run CachyDrop
 
 ```bash
 ./build/cachydrop
 ```
 
-If the application fails to build or start, check the terminal output for missing dependencies, CMake configuration errors, missing Qt modules, or QML import errors.
+If the build fails, review the CMake output for missing dependencies or configuration errors. If the application fails to start, check the terminal output for missing Qt modules, QML import errors, or runtime dependencies.
 
-## How to use
+## Using CachyDrop
 
-### Send files from your computer to your phone
+### Connect a phone
 
-1. Launch CachyDrop.
-2. Start the receiving service if it is not already running.
-3. Connect your phone using the displayed QR code or connection address.
-4. Select files using the file picker or drag and drop them into the transfer area.
-5. Follow the connection and transfer workflow presented by the application.
+1. Launch CachyDrop on your Linux computer.
+2. Start the receiving service if it isn't already running.
+3. Connect your phone to the same local network as your computer.
+4. Open the connection address or scan the QR code displayed by CachyDrop.
+5. Follow the pairing workflow presented by the application.
+6. Approve the pairing request on your computer when appropriate.
 
-### Receive files from your phone
+Make sure your computer and phone can communicate over the local network. Firewall settings may prevent connections.
 
-1. Start the receiving service on your computer.
-2. Connect your phone to the displayed address.
-3. Complete device pairing if authorization is required.
-4. Review the incoming transfer request and the available sender and file information.
-5. Approve the transfer only if you recognize and trust the sender. Otherwise, reject it.
+### Name and manage devices
 
-### Manage paired devices
+When a device requests pairing, you can assign it a recognizable name in the pairing approval dialog. This is especially useful for iPhones, iPads, and other browsers that provide only a generic device name.
 
-Open **Paired Devices** in the sidebar to view authorized devices. Remove a device to revoke its saved authorization.
+Open **Paired Devices** to view authorized devices. Removing a device revokes its saved authorization within the application.
 
-### Customize the interface
+### Transfer files
 
-Open **Appearance** to access available theme, accent color, interface style, and transparency preferences. Some appearance options may still be under development.
+Use the file picker or drag and drop files into the application to prepare them for transfer. Follow the connection and transfer workflow shown by CachyDrop.
+
+When receiving files, review the sender and file information before approving a transfer. Reject unexpected requests.
+
+## Technology stack
+
+- **C++20** — Application logic
+- **Qt 6** — Core application framework
+- **Qt Quick and QML** — User interface
+- **Qt Quick Controls** — Interface controls
+- **KDE Kirigami** — Desktop interface components
+- **CMake** — Build system
+- **libsodium** — Cryptographic primitives where implemented and used
+- **qrencode** — QR-code functionality
 
 ## Project structure
 
-CachyDrop separates its desktop interface from its C++ networking and transfer logic.
+The project separates the QML interface from the C++ networking and transfer logic.
 
-Relevant components include:
+Important components include:
 
-- `src/qml/Main.qml` — Main application interface, navigation, transfer controls, device management, and appearance settings.
-- `ReceiverServer.h` / `ReceiverServer.cpp` — Receiving-server lifecycle, connection handling, and server-side state.
-- `RequestRouter.h` / `RequestRouter.cpp` — HTTP endpoint routing for health checks, sessions, pairing, uploads, downloads, and transfer requests.
-- `HttpRequestParser` — HTTP request parsing.
-- `HttpUtils` — HTTP-related helper functionality.
-- `TransferUtils` — File-transfer helper functionality.
-- `CMakeLists.txt` — Build configuration and source dependencies.
+- `src/qml/Main.qml` — Main interface, navigation, pairing dialogs, device management, and appearance settings.
+- `ReceiverServer` — Receiving-server lifecycle and server-side state.
+- `RequestRouter` — HTTP endpoint routing.
+- `PairingManager` — Pairing requests and trusted-device management.
+- `CryptoManager` — Cryptographic identity and related cryptographic operations.
+- `CMakeLists.txt` — Build configuration and dependencies.
+- `tests/` — Automated tests.
 
-The exact file layout may evolve as the project is refactored.
+File names and component responsibilities may change as the project evolves.
 
 ## Security and privacy
 
-CachyDrop is designed around local file sharing, device pairing, and explicit approval of incoming transfers. These features help control access, but they do not automatically guarantee encrypted communication.
+CachyDrop is intended for local file sharing, with device pairing and explicit approval workflows to help users control access.
 
-### Planned security improvements
+However, **local-network communication, device pairing, and the presence of a cryptographic library do not by themselves guarantee secure file transfers**.
 
-- [ ] **Public/private-key management** — Generate and securely store a persistent private key while allowing the corresponding public key to be shared.
-- [ ] **Authenticated key exchange** — Establish a shared secret between paired devices and protect against key-substitution attacks.
-- [ ] **Encrypted file transfers** — Encrypt file contents before transmission and authenticate them before decryption.
-- [ ] **Pairing and session security** — Protect authorization tokens and prevent unauthorized reuse.
-- [ ] **Network exposure controls** — Review which network interfaces the receiving server listens on.
-- [ ] **Input validation** — Validate uploaded filenames, file sizes, request data, and destination paths.
-- [ ] **Transfer authorization** — Ensure transfers cannot bypass pairing, authorization, or approval checks.
+Until the relevant protections have been implemented and independently verified:
 
-These are planned improvements, not claims that every protection is currently implemented.
-
-### Before transferring sensitive files
-
-Until encryption and authentication have been implemented and verified, use CachyDrop only for files appropriate for an unverified local-network transfer.
-
+- Transfer only files appropriate for an unverified local-network application.
 - Connect only to devices and networks you trust.
-- Review incoming transfer requests before approving them.
-- Do not assume that pairing or session tokens encrypt file contents.
+- Review incoming requests before approving them.
+- Do not assume pairing or session tokens encrypt file contents.
 - Do not treat a QR code or a public key alone as proof of a device's identity.
+- Keep in mind that local-network traffic may be observable by other parties on the network.
 
-Security should be evaluated against the actual implementation, not simply the presence of security-related features or libraries.
+Security work includes authenticated key exchange, secure private-key storage, authenticated encryption of transferred files, robust session authorization, network exposure controls, and validation of uploaded filenames, file sizes, and destination paths.
+
+These are development goals, not claims that every protection is already implemented.
+
+## Development roadmap
+
+- [ ] Complete and review cryptographic identity management.
+- [ ] Implement authenticated key exchange between paired devices.
+- [ ] Implement authenticated encryption for file transfers.
+- [ ] Review pairing, session tokens, and authorization checks.
+- [ ] Audit upload validation and file-path handling.
+- [ ] Improve transfer progress, completion feedback, and error reporting.
+- [ ] Expand automated tests for pairing, authorization, and transfers.
+- [ ] Improve installation and packaging for supported Linux distributions.
+- [ ] Add screenshots and more complete user documentation.
 
 ## Contributing
 
 Contributions, bug reports, and suggestions are welcome.
 
-When reporting an issue, please include:
+When reporting a bug, include:
 
 - Your Linux distribution and version.
 - Your Qt version, if known.
-- Steps to reproduce the problem.
+- Steps to reproduce the issue.
 - Relevant terminal output or error messages.
-- Whether the issue affects sending, receiving, pairing, or the interface.
+- Whether the issue affects pairing, sending, receiving, or the interface.
 
-When contributing code, preserve existing pairing and authorization checks, validate external input carefully, and avoid weakening transfer security.
-
-## Roadmap
-
-- [ ] Implement persistent public/private-key management.
-- [ ] Implement authenticated key exchange between paired devices.
-- [ ] Encrypt and authenticate transferred file contents.
-- [ ] Review pairing, session-token, and authorization handling.
-- [ ] Audit upload validation and file-path handling.
-- [ ] Improve transfer progress, error reporting, and completion feedback.
-- [ ] Connect appearance preferences to their intended visual behavior.
-- [ ] Add automated tests for pairing, authorization, encryption, and file transfers.
-- [ ] Add screenshots and more complete installation instructions.
-- [ ] Provide packaged builds for supported Linux distributions.
+When contributing code, preserve existing authorization checks, validate external input carefully, and avoid weakening transfer security.
 
 ## License
 
-No license has been specified in this README. Add the project's chosen license and a corresponding `LICENSE` file before distributing the software publicly.
+A project license has not yet been specified. A license and corresponding `LICENSE` file will be added once the project's licensing terms have been decided.
+
+Until then, do not assume that the source code is licensed for unrestricted redistribution, modification, or commercial use.
 
 ## Acknowledgments
 
-CachyDrop is built with Qt Quick and KDE Kirigami to provide a native-feeling Linux desktop experience, with C++ handling the networking and file-transfer functionality.
+CachyDrop uses Qt, Qt Quick, KDE Kirigami, and libsodium to support its desktop interface and development of networking and cryptographic functionality.
+
+- [Qt](https://www.qt.io/)
+- [KDE Kirigami](https://develop.kde.org/frameworks/kirigami/)
+- [libsodium](https://doc.libsodium.org/)
+- [CachyDrop source code](https://github.com/ryeonnaderi/CachyDrop)
