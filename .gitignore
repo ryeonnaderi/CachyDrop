@@ -44,3 +44,19 @@ compile_commands.json
 *.njsproj
 *.sln
 *.sw?
+
+# AUR package build artifacts
+/packaging/aur/cachydrop-git/src/
+/packaging/aur/cachydrop-git/pkg/
+/packaging/aur/cachydrop-git/*.pkg.tar*
+/packaging/aur/cachydrop-git/*.src.tar*
+/packaging/aur/cachydrop-git/*.log
+/packaging/aur/cachydrop-git/*.log.*
+
+# CMake build output, anywhere in the repository
+/build/
+/cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/compile_commands.json

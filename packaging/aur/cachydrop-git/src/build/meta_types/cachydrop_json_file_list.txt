@@ -1,1 +1,0 @@
-/home/ryeon/Desktop/CachyDrop/packaging/aur/cachydrop-git/src/build/cachydrop_autogen/include/../UVLADIE3JM/moc_ReceiverServer.cpp.json

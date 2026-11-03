@@ -1,6 +1,0 @@
-<RCC>
-  <qresource prefix="/">
-    <file alias="/qt/qml/CachyDrop">/home/ryeon/Desktop/CachyDrop/packaging/aur/cachydrop-git/src/build/CachyDrop</file>
-
-  </qresource>
-</RCC>
