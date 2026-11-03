@@ -1,6 +1,7 @@
+
 # Maintainer: ryeonnaderi
 pkgname=cachydrop-git
-pkgver=0.1.0.r16.ge9b0ff5
+pkgver=0.1.0.r20.g137caeb
 pkgrel=1
 pkgdesc="Local file transfers between Linux computers and phones"
 arch=('x86_64')
@@ -28,24 +29,19 @@ source=("CachyDrop::git+https://github.com/ryeonnaderi/CachyDrop.git")
 sha256sums=('SKIP')
 
 pkgver() {
-  cd "$srcdir/CachyDrop"
-  printf '0.1.0.r%s.g%s' 
-    "$(git rev-list --count HEAD)" 
-    "$(git rev-parse --short HEAD)"
+  cd "$srcdir/CachyDrop" || return 1
+  local count hash
+  count=$(git rev-list --count HEAD) || return 1
+  hash=$(git rev-parse --short HEAD) || return 1
+  printf '0.1.0.r%s.g%s\n' "$count" "$hash"
 }
 
 build() {
-  cmake -S "$srcdir/CachyDrop" -B "$srcdir/build" 
-    -DCMAKE_BUILD_TYPE=Release 
-    -DCMAKE_INSTALL_PREFIX=/usr 
-    -G Ninja
-
+  cmake -S "$srcdir/CachyDrop" -B "$srcdir/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -G Ninja
   cmake --build "$srcdir/build"
 }
 
 package() {
   DESTDIR="$pkgdir" cmake --install "$srcdir/build"
-
-  install -Dm644 "$srcdir/CachyDrop/LICENSE" 
-    "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$srcdir/CachyDrop/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
